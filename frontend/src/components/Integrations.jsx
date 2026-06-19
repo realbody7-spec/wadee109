@@ -712,11 +712,18 @@ function setupSheetTemplate(sheet) {
     var r = mergeRangesRow2[m];
     if (r.startCol < r.endCol) {
       try {
-        sheet.groupColumns(r.startCol + 1, r.endCol);
+        sheet.getRange(1, r.startCol + 1, 1, r.endCol - r.startCol).shiftColumnGroupDepth(1);
       } catch (e) {
-        // ข้ามหากติดปัญหาการจัดกลุ่มซ้อน
+        // ข้ามหากติดปัญหา
       }
     }
+  }
+  
+  // ยุบกลุ่มคอลัมน์ทั้งหมดโดยอัตโนมัติ เพื่อให้แสดงปุ่มเครื่องหมายบวก (+) สำหรับยุบตาราง
+  try {
+    sheet.collapseAllColumnGroups();
+  } catch (e) {
+    // ข้ามหากไม่สามารถยุบได้
   }
 }`}`}
                 onClick={(e) => {
