@@ -485,14 +485,23 @@ function doPost(e) {
     
     var lastCol = sheet.getLastColumn();
     var headersRow2 = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
+    var headersRow3 = sheet.getRange(3, 1, 1, lastCol).getValues()[0];
+    
+    // สร้างอาร์เรย์สรุปชื่อรายการของแต่ละคอลัมน์
+    var columns = [];
+    for (var i = 0; i < lastCol; i++) {
+      var itemVal = (headersRow3[i] || '').toString().trim();
+      var catVal = (headersRow2[i] || '').toString().trim();
+      columns.push(itemVal !== '' ? itemVal : catVal);
+    }
     
     // ค้นหาคอลัมน์ที่ตรงกับชื่อสินค้า
     var colIndex = -1;
     var itemNameLower = (data.name || '').trim().toLowerCase();
     
     // 1. ค้นหาแบบตรงตัวก่อน (Exact Match)
-    for (var i = 5; i < headersRow2.length; i++) {
-      if (headersRow2[i] && headersRow2[i].toString().trim().toLowerCase() === itemNameLower) {
+    for (var i = 5; i < columns.length; i++) {
+      if (columns[i] && columns[i].toString().trim().toLowerCase() === itemNameLower) {
         colIndex = i + 1;
         break;
       }
@@ -500,9 +509,9 @@ function doPost(e) {
     
     // 2. ค้นหาแบบใกล้เคียงหากไม่เจอตรงตัว (Partial Match)
     if (colIndex === -1 && itemNameLower) {
-      for (var i = 5; i < headersRow2.length; i++) {
-        if (headersRow2[i]) {
-          var headerLower = headersRow2[i].toString().trim().toLowerCase();
+      for (var i = 5; i < columns.length; i++) {
+        if (columns[i]) {
+          var headerLower = columns[i].toString().trim().toLowerCase();
           if (itemNameLower.indexOf(headerLower) !== -1 || headerLower.indexOf(itemNameLower) !== -1) {
             colIndex = i + 1;
             break;
@@ -513,8 +522,8 @@ function doPost(e) {
     
     // 3. หากยังไม่พบอีก ให้หาช่อง 'อื่นๆ'
     if (colIndex === -1) {
-      for (var i = 5; i < headersRow2.length; i++) {
-        if (headersRow2[i] && headersRow2[i].toString().trim() === 'อื่นๆ') {
+      for (var i = 5; i < columns.length; i++) {
+        if (columns[i] && columns[i].toString().trim() === 'อื่นๆ') {
           colIndex = i + 1;
           break;
         }
@@ -539,8 +548,8 @@ function doPost(e) {
     }
     
     // ใส่ลิงก์รูปภาพในคอลัมน์สุดท้าย
-    for (var i = 5; i < headersRow2.length; i++) {
-      if (headersRow2[i] && headersRow2[i].toString().trim() === 'รูปภาพบิล') {
+    for (var i = 5; i < columns.length; i++) {
+      if (columns[i] && columns[i].toString().trim() === 'รูปภาพบิล') {
         newRow[i] = driveFileUrl;
         break;
       }
@@ -564,81 +573,152 @@ function doPost(e) {
 function setupSheetTemplate(sheet) {
   sheet.clear();
   
-  var row1 = ['วันที่สั่งซื้อ', 'เลขสินค้า คำสั่งซื้อ', 'ยอดรวมบิล', 'รายการ', 'จำนวน'];
+  // 1. กำหนดหัวตารางหลัก A-E
+  var row1 = ['วันที่สั่งซื้อ', 'เลขสินค้า ค่าสั่งซื้อ', 'ยอดรวมบิล', 'รายการ', 'จำนวน'];
   var row2 = ['', '', '', '', ''];
+  var row3 = ['', '', '', '', ''];
   
   var schema = [
-    { category: 'เครืองครัว/ของแห้ง', items: ['น้ำตาลปีป', 'น้ำตาลทราย', 'งาขาว', 'ชูรส', 'น้ำปลา', 'น้ำส้มสายชู', 'น้ำปลาร้า', 'น้ำมัน', 'น้ำมันงา', 'ซอทมะเขือ', 'ซอทพริก', 'มายองเนส', 'น้ำจิ้มบ๋วย', 'ซอทสูตร5', 'ซอทหอยนางรม', 'ซีอิ้วฉลากเเดง', 'ซีอิ่วขาว สูตร1', 'ซอทฝาเขียว', 'เบคกิ่งโซดา', 'ไวไว', 'มาม่า', 'หมี่หยก', 'วุ้นเส้น', 'ข้าวสาร', 'ข้าวคั่ว', 'ผงมะนาว', 'กระเทียมดอง', 'น้ำมะขาม', 'พริงป่น', 'โชยุ', 'วาซาบิ', 'เกลือ', 'น้ำยาล้างจาน', 'ผงซักฟอก', 'ถุงขยะ  18*20', 'ถุงหิ้ว     12*26', 'ถุงร้อน  8*12', 'ถุงหิ้ว     8*16', 'ไข่ไก่', 'เต้าหู้ไข่'] },
-    { category: 'ผัก', items: ['กระหล่ำ', 'เห็ดเข็ม', 'แครอท', 'ผักบุ้ง', 'ข้าวโพด', 'ต้นหอม', 'ผักชี', 'ตั้งโอ๋', 'กระเทียม', 'กระเทียมเจียว', 'พริกไทย', 'พริกเขียว', 'พริกเเดง', 'กุ้งแห้ง', 'มะละกอ', 'มะนาว', 'หอมใหญ่', 'หอมเเดง', 'มะเขีอเทศ', 'ถัวฝักยาว', 'ถัวตำไทย', 'ใบกะเพรา', 'ข่า', 'ตะใคร้', 'ใบบะกรูด', 'ผักชีใบเลื่อย', 'โหระพา', 'ใบเตย', 'เม็ดมะม่วง'] },
-    { category: 'เนื้อหมูู / ไก่', items: ['เนื้อหมู', 'สามชั้น', 'สันคอ', 'หมูสับ', 'ตับ', 'เบคอน', 'เอ็นไก่', 'ปีกไก่', 'มันหมูเจียว', 'กระดูกหมู', 'สะโพกหมู', 'มันก้อน'] },
-    { category: 'เนื้อวัว', items: ['สันคอ', 'เสือ', 'สันใน', 'เนื้อออส', 'ผ้าคีริ้ว', 'สามชั้น', 'สันนอก'] },
-    { category: 'ทะเล', items: ['หมึกสด', 'หมึกหมูกะทะ', 'หมึกกรอบ', 'กุ้ง', 'กุ้ง หมูกะทะ', 'ปูอัด', 'เต้าหู้ปลา', 'กะพรุน'] },
-    { category: 'ของทอด', items: ['เกี๋ยวซ่า', 'เฟรนฟราย', 'นักเก็ต', 'ไก่กรอบ', 'แป้งทอดกรอบ', 'เอโร่ อิบิโรลไส้กุ้งแช่แข็ง', 'เต้าหู้ชีท'] },
-    { category: 'น้ำจิ่ม', items: ['วดี', 'BBQ'] },
-    { category: 'เครืองดื่ม', items: ['น้ำอัดลม', 'โซดา', 'น้ำเปล่า', 'หลอดน้ำงอ', 'เบียร์ช้าง', 'เบียร์ลีโอ', 'เบียร์สิงห์', 'รีเเบน', 'รีกลม', 'ขนมหวาน', 'ไอติม'] },
-    { category: 'Asset', items: ['แปลงขัดกระทะ', 'สเปรย์กำจัดแมลง', 'กาวดักแมงวัล', 'น้ำยาถูพื้น', 'น้ำยาล้างจาน', 'ล้างห้องน้ำ', 'สบูล้างมือ', 'น้ำยาเช็ดโต๊ะ', 'ทิชชู่', 'หลอดงอ', 'ตะเกียบไม้', 'กระดาษความร้อน', 'อื่นๆ'] },
-    { category: 'เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน', items: ['เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน'] },
-    { category: 'ค่าส่งของ', items: ['ค่าส่งของ'] },
-    { category: 'น้ำเเข็ง', items: ['หลอด', 'บด'] },
-    { category: 'แก๊ส', items: ['แก๊ส'] },
-    { category: 'ถ่าน', items: ['ถ่าน'] },
-    { category: 'ค่าน้ำ + ต่าไฟ + เน็ต', items: ['ค่าน้ำ + ต่าไฟ + เน็ต'] },
-    { category: 'การตลาด/ปรับปรุงร้าน', items: ['การตลาด/ปรับปรุงร้าน'] },
-    { category: 'ค่าบริการ', items: ['ค่าบริการ'] },
-    { category: 'ภาพถ่ายบิล', items: ['รูปภาพบิล'] }
+    { category: 'เครื่องครัว/ของแห้ง', color: '#d9e1f2', items: ['น้ำตาลปี๊บ', 'น้ำตาลทราย', 'งาขาว', 'ชูรส', 'น้ำปลา', 'น้ำส้มสายชู', 'น้ำปลาร้า', 'น้ำมัน', 'น้ำมันงา', 'ซอสมะเขือ', 'ซอสพริก', 'มายองเนส', 'น้ำจิ้มบ๊วย', 'ซอสสูตร5', 'ซอสหอยนางรม', 'ซีอิ๊วฉลากแดง', 'ซีอิ๊วขาว สูตร1', 'ซอสฝาเขียว', 'เบกกิ้งโซดา', 'ไวไว', 'มาม่า', 'หมี่หยก', 'วุ้นเส้น', 'ข้าวสาร', 'ข้าวคั่ว', 'ผงมะนาว', 'กระเทียมดอง', 'น้ำมะขาม', 'พริกป่น', 'โชยุ', 'วาซาบิ', 'เกลือ', 'น้ำยาล้างจาน', 'ผงซักฟอก', 'ถุงขยะ 18*20', 'ถุงหิ้ว 12*26', 'ถุงร้อน 8*12', 'ถุงหิ้ว 8*16', 'ไข่ไก่', 'เต้าหู้ไข่'] },
+    { category: 'ผัก', color: '#00ffff', items: ['กะหล่ำ', 'เห็ดเข็ม', 'แครอท', 'ผักบุ้ง', 'ข้าวโพด', 'ต้นหอม', 'ผักชี', 'ตั้งโอ๋', 'กระเทียม', 'กระเทียมเจียว', 'พริกไทย', 'พริกเขียว', 'พริกแดง', 'กุ้งแห้ง', 'มะละกอ', 'มะนาว', 'หอมใหญ่', 'หอมแดง', 'มะเขือเทศ', 'ถั่วฝักยาว', 'ถั่วตำไทย', 'ใบกะเพรา', 'ข่า', 'ตะไคร้', 'ใบมะกรูด', 'ผักชีใบเลื่อย', 'โหระพา', 'ใบเตย', 'เม็ดมะม่วง'] },
+    { category: 'เนื้อหมู / ไก่', color: '#00ff00', items: ['เนื้อหมู', 'สามชั้น', 'สันคอ', 'หมูสับ', 'ตับ', 'เบคอน', 'เอ็นไก่', 'ปีกไก่', 'มันหมูเจียว', 'กระดูกหมู', 'สะโพกหมู', 'มันก้อน'] },
+    { category: 'เนื้อวัว', color: '#b4c6e7', items: ['สันคอ', 'เสือ', 'สันใน', 'เนื้อออส', 'ผ้าขี้ริ้ว', 'สามชั้น', 'สันนอก'] },
+    { category: 'ทะเล', color: '#c6e0b4', items: ['หมึกสด', 'หมึกหมูกะทะ', 'หมึกกรอบ', 'กุ้ง', 'กุ้ง หมูกะทะ', 'ปูอัด', 'เต้าหู้ปลา', 'กะพรุน'] },
+    { category: 'ของทอด', color: '#f8cbad', items: ['เกี๊ยวซ่า', 'เฟรนฟราย', 'นักเก็ต', 'ไก่กรอบ', 'แป้งทอดกรอบ', 'เอโร่ อิบิโรลไส้กุ้งแช่แข็ง', 'เต้าหู้ชีส'] },
+    { category: 'น้ำจิ้ม', color: '#b4a7d6', items: ['วดี', 'BBQ'] },
+    { category: 'เครื่องดื่ม', color: '#ffff00', items: ['น้ำอัดลม', 'โซดา', 'น้ำเปล่า', 'หลอดน้ำงอ', 'เบียร์ช้าง', 'เบียร์ลีโอ', 'เบียร์สิงห์', 'รีแบน', 'รีกลม', 'ขนมหวาน', 'ไอติม'] },
+    { category: 'Asset', color: '#ffffff', items: ['แปรงขัดกระทะ', 'สเปรย์กำจัดแมลง', 'กาวดักแมลงวัน', 'น้ำยาถูพื้น', 'น้ำยาล้างจาน', 'ล้างห้องน้ำ', 'สบู่ล้างมือ', 'น้ำยาเช็ดโต๊ะ', 'ทิชชู่', 'หลอดงอ', 'ตะเกียบไม้', 'กระดาษความร้อน', 'อื่นๆ'] },
+    { category: 'เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน', color: '#ffffff', items: ['เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน'] },
+    { category: 'ค่าส่งของ', color: '#ffffff', items: ['ค่าส่งของ'] },
+    { category: 'น้ำแข็ง', color: '#ffffff', items: ['หลอด', 'บด'] },
+    { category: 'แก๊ส', color: '#ffffff', items: ['แก๊ส'] },
+    { category: 'ถ่าน', color: '#ffffff', items: ['ถ่าน'] },
+    { category: 'ค่าน้ำ + ค่าไฟ + เน็ต', color: '#ffffff', items: ['ค่าน้ำ + ค่าไฟ + เน็ต'] },
+    { category: 'การตลาด/ปรับปรุงร้าน', color: '#ffffff', items: ['การตลาด/ปรับปรุงร้าน'] },
+    { category: 'ค่าบริการ', color: '#ffffff', items: ['ค่าบริการ'] },
+    { category: 'ภาพถ่ายบิล', color: '#ffffff', items: ['รูปภาพบิล'] }
   ];
-  
+
   var colIndex = 6;
-  var mergeRanges = [];
+  var mergeRangesRow2 = [];
+  var verticalMergeCols = [];
+  
+  // หาจำนวนคอลัมน์ของกลุ่มวัตถุดิบ (COGS)
+  var cogsEndCol = 5;
+  for (var i = 0; i <= 8; i++) {
+    cogsEndCol += schema[i].items.length;
+  }
   
   for (var i = 0; i < schema.length; i++) {
     var cat = schema[i];
     var numItems = cat.items.length;
-    row1.push(cat.category);
+    
+    // แถวที่ 1: COGS เป็นค่าว่าง (เพื่อใช้ระบายสีเขียว), ค่าบริการใส่ "ค่าบริการ"
+    var row1Value = (i >= 9) ? 'ค่าบริการ' : '';
+    for (var j = 0; j < numItems; j++) {
+      row1.push(row1Value);
+    }
+    
+    // แถวที่ 2:
+    row2.push(cat.category);
     for (var j = 1; j < numItems; j++) {
-      row1.push('');
+      row2.push('');
     }
-    for (var k = 0; k < numItems; k++) {
-      row2.push(cat.items[k]);
+    
+    // แถวที่ 3:
+    if (numItems > 1) {
+      for (var k = 0; k < numItems; k++) {
+        row3.push(cat.items[k]);
+      }
+      mergeRangesRow2.push({
+        startCol: colIndex,
+        endCol: colIndex + numItems - 1,
+        color: cat.color
+      });
+    } else {
+      row3.push('');
+      verticalMergeCols.push({
+        col: colIndex,
+        color: cat.color
+      });
     }
-    mergeRanges.push({
-      startCol: colIndex,
-      endCol: colIndex + numItems - 1
-    });
+    
     colIndex += numItems;
   }
   
-  sheet.getRange(1, 1, 1, row1.length).setValues([row1]);
-  sheet.getRange(2, 1, 1, row2.length).setValues([row2]);
-  
-  for (var c = 1; c <= 5; c++) {
-    sheet.getRange(1, c, 2, 1).merge();
-  }
-  
-  for (var m = 0; m < mergeRanges.length; m++) {
-    var r = mergeRanges[m];
-    if (r.startCol < r.endCol) {
-      sheet.getRange(1, r.startCol, 1, r.endCol - r.startCol + 1).merge();
-    }
-  }
-  
   var totalCols = row1.length;
-  var headerRange = sheet.getRange(1, 1, 2, totalCols);
-  headerRange.setBackground('#3c332a');
-  headerRange.setFontColor('#ffffff');
+  
+  // เขียนข้อมูลลงในชีตทีเดียว 3 แถว
+  sheet.getRange(1, 1, 1, totalCols).setValues([row1]);
+  sheet.getRange(2, 1, 1, totalCols).setValues([row2]);
+  sheet.getRange(3, 1, 1, totalCols).setValues([row3]);
+  
+  // ยุบรวมแนวตั้งสำหรับคอลัมน์ A-E (วันที่สั่งซื้อ, เลขบิล, ยอดรวม, รายการ, จำนวน)
+  for (var c = 1; c <= 5; c++) {
+    sheet.getRange(1, c, 3, 1).merge();
+  }
+  
+  // ยุบรวมแถวที่ 1 แนวนอน
+  // 1. กลุ่มวัตถุดิบ (คอลัมน์ F ถึง cogsEndCol)
+  var cogsRange = sheet.getRange(1, 6, 1, cogsEndCol - 6 + 1);
+  cogsRange.merge();
+  cogsRange.setBackground('#00ff00'); // สีเขียวสว่าง
+  
+  // 2. กลุ่มค่าบริการ (คอลัมน์ cogsEndCol + 1 ถึงคอลัมน์สุดท้าย)
+  var serviceRange = sheet.getRange(1, cogsEndCol + 1, 1, totalCols - cogsEndCol);
+  serviceRange.merge();
+  serviceRange.setBackground('#00ffff'); // สีฟ้าไซแอน
+  
+  // ยุบรวมแถวที่ 2 แนวนอน (สำหรับหมวดหมู่ที่มีหลายสินค้า)
+  for (var m = 0; m < mergeRangesRow2.length; m++) {
+    var r = mergeRangesRow2[m];
+    var range = sheet.getRange(2, r.startCol, 1, r.endCol - r.startCol + 1);
+    range.merge();
+    range.setBackground(r.color);
+  }
+  
+  // ยุบรวมแนวตั้ง แถว 2 และ 3 (สำหรับหมวดหมู่ที่มีสินค้าเดียว)
+  for (var v = 0; v < verticalMergeCols.length; v++) {
+    var colInfo = verticalMergeCols[v];
+    var range = sheet.getRange(2, colInfo.col, 2, 1);
+    range.merge();
+    range.setBackground(colInfo.color);
+  }
+  
+  // กำหนดสไตล์หัวตารางทั้งหมด
+  var headerRange = sheet.getRange(1, 1, 3, totalCols);
+  headerRange.setFontColor('#000000');
   headerRange.setFontWeight('bold');
   headerRange.setHorizontalAlignment('center');
   headerRange.setVerticalAlignment('middle');
+  headerRange.setBorder(true, true, true, true, true, true);
   
+  // ตั้งค่าความสูงแถว
   sheet.setRowHeight(1, 30);
   sheet.setRowHeight(2, 35);
-  sheet.setFrozenRows(2);
+  sheet.setRowHeight(3, 35);
+  
+  // ตรึงแถวและคอลัมน์
+  sheet.setFrozenRows(3);
   sheet.setFrozenColumns(5);
   
+  // จัดความกว้างคอลัมน์อัตโนมัติ
   for (var col = 1; col <= totalCols; col++) {
     sheet.autoResizeColumn(col);
   }
-}`}
+  
+  // ตั้งค่ากลุ่มคอลัมน์ (Grouping) เพื่อให้ยุบได้แบบในภาพ
+  for (var m = 0; m < mergeRangesRow2.length; m++) {
+    var r = mergeRangesRow2[m];
+    if (r.startCol < r.endCol) {
+      try {
+        sheet.groupColumns(r.startCol + 1, r.endCol);
+      } catch (e) {
+        // ข้ามหากติดปัญหาการจัดกลุ่มซ้อน
+      }
+    }
+  }
+}`}`}
                 onClick={(e) => {
                   e.target.select();
                   navigator.clipboard.writeText(e.target.value);
