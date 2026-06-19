@@ -4,12 +4,14 @@
   "description": "Fullstack Restaurant SOP Notifier and Inventory Manager",
   "main": "backend/server.js",
   "type": "module",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "install-backend": "cd backend && npm install",
-    "install-frontend": "cd frontend && npm install",
-    "build-frontend": "cd frontend && npm run build",
+    "build-frontend": "npm run build -w frontend",
     "copy-frontend": "node scripts/copy-frontend.js",
-    "build": "npm run install-backend && npm run install-frontend && npm run build-frontend && npm run copy-frontend",
+    "build": "npm run build-frontend && npm run copy-frontend",
     "start": "node backend/server.js"
   },
   "engines": {
