@@ -19,3 +19,5 @@ frontend/dist/
 # Ignore user uploaded receipt images but keep the uploads folder structure
 backend/public/uploads/*
 !backend/public/uploads/.gitkeep
+backend/public/assets/
+backend/public/index.html

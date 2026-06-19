@@ -29,6 +29,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 const SOPS_FILE = path.join(__dirname, 'data', 'sops.json');
 const SCHEDULES_FILE = path.join(__dirname, 'data', 'schedules.json');
@@ -64,8 +65,8 @@ function writeData(filePath, data) {
   }
 }
 
-// --- Home API ---
-app.get('/', (req, res) => {
+// --- Status API ---
+app.get('/api/status', (req, res) => {
   res.json({
     status: "online",
     message: "Welcome to the Restaurant SOP Notifier Backend API",
@@ -759,6 +760,16 @@ app.get('/api/events', (req, res) => {
     removeSseClient(res);
     console.log(`[SSE] Client disconnected. Active clients: ${getSseClientsCount()}`);
   });
+});
+
+// Catch-all route to serve the React frontend index.html
+app.get('*', (req, res) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send('Not Found');
+  }
 });
 
 // Start server and cron scheduler
