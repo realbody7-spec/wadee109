@@ -417,7 +417,17 @@ export default function Integrations({ settings, onSaveSettings }) {
                 className="form-control"
                 readOnly
                 style={{ fontFamily: 'monospace', fontSize: '0.75rem', height: '140px', backgroundColor: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-card)', color: 'var(--text-secondary)' }}
-                value={`function doPost(e) {
+                value={`function doGet(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    setupSheetTemplate(sheet);
+    return ContentService.createTextOutput("สร้างตารางรายการคอลัมน์บัญชีร้านสำเร็จเรียบร้อยแล้ว! สามารถเปิดดูใน Google Sheet ของคุณได้เลยครับ").setMimeType(ContentService.MimeType.TEXT);
+  } catch (err) {
+    return ContentService.createTextOutput("เกิดข้อผิดพลาด: " + err.toString()).setMimeType(ContentService.MimeType.TEXT);
+  }
+}
+
+function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     
@@ -436,7 +446,6 @@ export default function Integrations({ settings, onSaveSettings }) {
           var filename = 'bill-' + (data.name || 'item') + '-' + Date.now() + '.' + (mimeType.split('/')[1] || 'jpeg');
           var blob = Utilities.newBlob(decodedBytes, mimeType, filename);
           
-          // ค้นหาโฟลเดอร์ตามไอดีที่กำหนด หากไม่พบข้อผิดพลาดหรือไม่ได้ระบุ จะค้นหาหรือสร้างชื่อ Restaurant Bills แทน
           var folder;
           if (data.driveFolderId) {
             try {
@@ -458,7 +467,6 @@ export default function Integrations({ settings, onSaveSettings }) {
             }
           }
           
-          // สร้างไฟล์และตั้งสิทธิ์ให้ทุกคนเข้าถึงรูปภาพได้
           var file = folder.createFile(blob);
           file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
           driveFileUrl = file.getUrl();
@@ -468,21 +476,77 @@ export default function Integrations({ settings, onSaveSettings }) {
       }
     }
     
-    // บันทึกแถวข้อมูลลงใน Google Sheet
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    sheet.appendRow([
-      new Date(data.date || new Date()),
-      data.name,
-      data.category,
-      data.quantity,
-      data.unit,
-      data.cost,
-      data.billNumber || '-',
-      data.portionSize,
-      data.portionUnit,
-      data.associatedPosItem || data.name,
-      driveFileUrl
-    ]);
+    
+    // ตรวจสอบว่าแผ่นงานมีหัวตารางคอลัมน์แล้วหรือยัง หากไม่มีให้สร้างอัตโนมัติ
+    if (sheet.getLastColumn() < 5) {
+      setupSheetTemplate(sheet);
+    }
+    
+    var lastCol = sheet.getLastColumn();
+    var headersRow2 = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
+    
+    // ค้นหาคอลัมน์ที่ตรงกับชื่อสินค้า
+    var colIndex = -1;
+    var itemNameLower = (data.name || '').trim().toLowerCase();
+    
+    // 1. ค้นหาแบบตรงตัวก่อน (Exact Match)
+    for (var i = 5; i < headersRow2.length; i++) {
+      if (headersRow2[i] && headersRow2[i].toString().trim().toLowerCase() === itemNameLower) {
+        colIndex = i + 1;
+        break;
+      }
+    }
+    
+    // 2. ค้นหาแบบใกล้เคียงหากไม่เจอตรงตัว (Partial Match)
+    if (colIndex === -1 && itemNameLower) {
+      for (var i = 5; i < headersRow2.length; i++) {
+        if (headersRow2[i]) {
+          var headerLower = headersRow2[i].toString().trim().toLowerCase();
+          if (itemNameLower.indexOf(headerLower) !== -1 || headerLower.indexOf(itemNameLower) !== -1) {
+            colIndex = i + 1;
+            break;
+          }
+        }
+      }
+    }
+    
+    // 3. หากยังไม่พบอีก ให้หาช่อง 'อื่นๆ'
+    if (colIndex === -1) {
+      for (var i = 5; i < headersRow2.length; i++) {
+        if (headersRow2[i] && headersRow2[i].toString().trim() === 'อื่นๆ') {
+          colIndex = i + 1;
+          break;
+        }
+      }
+    }
+    
+    // สร้างแถวข้อมูลใหม่และเติมค่าเริ่มต้น
+    var newRow = [];
+    for (var i = 0; i < lastCol; i++) {
+      newRow.push('');
+    }
+    
+    newRow[0] = new Date(data.date || new Date());
+    newRow[1] = data.billNumber || '-';
+    newRow[2] = data.cost || 0;
+    newRow[3] = data.name;
+    newRow[4] = data.quantity || 0;
+    
+    // ใส่จำนวนเงิน (หรือจำนวนสินค้า) ไปในคอลัมน์ที่ถูกต้อง
+    if (colIndex !== -1 && colIndex <= lastCol) {
+      newRow[colIndex - 1] = data.quantity || 0;
+    }
+    
+    // ใส่ลิงก์รูปภาพในคอลัมน์สุดท้าย
+    for (var i = 5; i < headersRow2.length; i++) {
+      if (headersRow2[i] && headersRow2[i].toString().trim() === 'รูปภาพบิล') {
+        newRow[i] = driveFileUrl;
+        break;
+      }
+    }
+    
+    sheet.appendRow(newRow);
     
     return ContentService.createTextOutput(JSON.stringify({
       success: true, 
@@ -494,6 +558,85 @@ export default function Integrations({ settings, onSaveSettings }) {
       success: false, 
       error: err.toString()
     })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function setupSheetTemplate(sheet) {
+  sheet.clear();
+  
+  var row1 = ['วันที่สั่งซื้อ', 'เลขสินค้า คำสั่งซื้อ', 'ยอดรวมบิล', 'รายการ', 'จำนวน'];
+  var row2 = ['', '', '', '', ''];
+  
+  var schema = [
+    { category: 'เครืองครัว/ของแห้ง', items: ['น้ำตาลปีป', 'น้ำตาลทราย', 'งาขาว', 'ชูรส', 'น้ำปลา', 'น้ำส้มสายชู', 'น้ำปลาร้า', 'น้ำมัน', 'น้ำมันงา', 'ซอทมะเขือ', 'ซอทพริก', 'มายองเนส', 'น้ำจิ้มบ๋วย', 'ซอทสูตร5', 'ซอทหอยนางรม', 'ซีอิ้วฉลากเเดง', 'ซีอิ่วขาว สูตร1', 'ซอทฝาเขียว', 'เบคกิ่งโซดา', 'ไวไว', 'มาม่า', 'หมี่หยก', 'วุ้นเส้น', 'ข้าวสาร', 'ข้าวคั่ว', 'ผงมะนาว', 'กระเทียมดอง', 'น้ำมะขาม', 'พริงป่น', 'โชยุ', 'วาซาบิ', 'เกลือ', 'น้ำยาล้างจาน', 'ผงซักฟอก', 'ถุงขยะ  18*20', 'ถุงหิ้ว     12*26', 'ถุงร้อน  8*12', 'ถุงหิ้ว     8*16', 'ไข่ไก่', 'เต้าหู้ไข่'] },
+    { category: 'ผัก', items: ['กระหล่ำ', 'เห็ดเข็ม', 'แครอท', 'ผักบุ้ง', 'ข้าวโพด', 'ต้นหอม', 'ผักชี', 'ตั้งโอ๋', 'กระเทียม', 'กระเทียมเจียว', 'พริกไทย', 'พริกเขียว', 'พริกเเดง', 'กุ้งแห้ง', 'มะละกอ', 'มะนาว', 'หอมใหญ่', 'หอมเเดง', 'มะเขีอเทศ', 'ถัวฝักยาว', 'ถัวตำไทย', 'ใบกะเพรา', 'ข่า', 'ตะใคร้', 'ใบบะกรูด', 'ผักชีใบเลื่อย', 'โหระพา', 'ใบเตย', 'เม็ดมะม่วง'] },
+    { category: 'เนื้อหมูู / ไก่', items: ['เนื้อหมู', 'สามชั้น', 'สันคอ', 'หมูสับ', 'ตับ', 'เบคอน', 'เอ็นไก่', 'ปีกไก่', 'มันหมูเจียว', 'กระดูกหมู', 'สะโพกหมู', 'มันก้อน'] },
+    { category: 'เนื้อวัว', items: ['สันคอ', 'เสือ', 'สันใน', 'เนื้อออส', 'ผ้าคีริ้ว', 'สามชั้น', 'สันนอก'] },
+    { category: 'ทะเล', items: ['หมึกสด', 'หมึกหมูกะทะ', 'หมึกกรอบ', 'กุ้ง', 'กุ้ง หมูกะทะ', 'ปูอัด', 'เต้าหู้ปลา', 'กะพรุน'] },
+    { category: 'ของทอด', items: ['เกี๋ยวซ่า', 'เฟรนฟราย', 'นักเก็ต', 'ไก่กรอบ', 'แป้งทอดกรอบ', 'เอโร่ อิบิโรลไส้กุ้งแช่แข็ง', 'เต้าหู้ชีท'] },
+    { category: 'น้ำจิ่ม', items: ['วดี', 'BBQ'] },
+    { category: 'เครืองดื่ม', items: ['น้ำอัดลม', 'โซดา', 'น้ำเปล่า', 'หลอดน้ำงอ', 'เบียร์ช้าง', 'เบียร์ลีโอ', 'เบียร์สิงห์', 'รีเเบน', 'รีกลม', 'ขนมหวาน', 'ไอติม'] },
+    { category: 'Asset', items: ['แปลงขัดกระทะ', 'สเปรย์กำจัดแมลง', 'กาวดักแมงวัล', 'น้ำยาถูพื้น', 'น้ำยาล้างจาน', 'ล้างห้องน้ำ', 'สบูล้างมือ', 'น้ำยาเช็ดโต๊ะ', 'ทิชชู่', 'หลอดงอ', 'ตะเกียบไม้', 'กระดาษความร้อน', 'อื่นๆ'] },
+    { category: 'เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน', items: ['เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน'] },
+    { category: 'ค่าส่งของ', items: ['ค่าส่งของ'] },
+    { category: 'น้ำเเข็ง', items: ['หลอด', 'บด'] },
+    { category: 'แก๊ส', items: ['แก๊ส'] },
+    { category: 'ถ่าน', items: ['ถ่าน'] },
+    { category: 'ค่าน้ำ + ต่าไฟ + เน็ต', items: ['ค่าน้ำ + ต่าไฟ + เน็ต'] },
+    { category: 'การตลาด/ปรับปรุงร้าน', items: ['การตลาด/ปรับปรุงร้าน'] },
+    { category: 'ค่าบริการ', items: ['ค่าบริการ'] },
+    { category: 'ภาพถ่ายบิล', items: ['รูปภาพบิล'] }
+  ];
+  
+  var colIndex = 6;
+  var mergeRanges = [];
+  
+  for (var i = 0; i < schema.length; i++) {
+    var cat = schema[i];
+    var numItems = cat.items.length;
+    row1.push(cat.category);
+    for (var j = 1; j < numItems; j++) {
+      row1.push('');
+    }
+    for (var k = 0; k < numItems; k++) {
+      row2.push(cat.items[k]);
+    }
+    mergeRanges.push({
+      startCol: colIndex,
+      endCol: colIndex + numItems - 1
+    });
+    colIndex += numItems;
+  }
+  
+  sheet.getRange(1, 1, 1, row1.length).setValues([row1]);
+  sheet.getRange(2, 1, 1, row2.length).setValues([row2]);
+  
+  for (var c = 1; c <= 5; c++) {
+    sheet.getRange(1, c, 2, 1).merge();
+  }
+  
+  for (var m = 0; m < mergeRanges.length; m++) {
+    var r = mergeRanges[m];
+    if (r.startCol < r.endCol) {
+      sheet.getRange(1, r.startCol, 1, r.endCol - r.startCol + 1).merge();
+    }
+  }
+  
+  var totalCols = row1.length;
+  var headerRange = sheet.getRange(1, 1, 2, totalCols);
+  headerRange.setBackground('#3c332a');
+  headerRange.setFontColor('#ffffff');
+  headerRange.setFontWeight('bold');
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setVerticalAlignment('middle');
+  
+  sheet.setRowHeight(1, 30);
+  sheet.setRowHeight(2, 35);
+  sheet.setFrozenRows(2);
+  sheet.setFrozenColumns(5);
+  
+  for (var col = 1; col <= totalCols; col++) {
+    sheet.autoResizeColumn(col);
   }
 }`}
                 onClick={(e) => {
