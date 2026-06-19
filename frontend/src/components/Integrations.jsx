@@ -725,7 +725,7 @@ function setupSheetTemplate(sheet) {
   } catch (e) {
     // ข้ามหากไม่สามารถยุบได้
   }
-}`}`}
+}`}
                 onClick={(e) => {
                   e.target.select();
                   navigator.clipboard.writeText(e.target.value);
