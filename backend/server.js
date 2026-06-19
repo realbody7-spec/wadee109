@@ -354,6 +354,24 @@ app.delete('/api/users/:id', (req, res) => {
   res.json({ success: true });
 });
 
+app.put('/api/users/:id/password', (req, res) => {
+  const { newPassword } = req.body;
+  if (!newPassword || newPassword.trim().length === 0) {
+    return res.status(400).json({ error: 'กรุณากรอกรหัสผ่านใหม่' });
+  }
+
+  const users = readData(USERS_FILE, []);
+  const userIndex = users.findIndex(u => u.id === req.params.id);
+
+  if (userIndex === -1) {
+    return res.status(404).json({ error: 'ไม่พบผู้ใช้งานที่ต้องการเปลี่ยนรหัสผ่าน' });
+  }
+
+  users[userIndex].password = newPassword.trim();
+  writeData(USERS_FILE, users);
+  res.json({ success: true, message: 'เปลี่ยนรหัสผ่านสำเร็จเรียบร้อยแล้ว!' });
+});
+
 // --- LOGS API ---
 app.get('/api/logs', (req, res) => {
   res.json(readData(LOGS_FILE, []));

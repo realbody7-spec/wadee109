@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Trash2, Shield, Users, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { UserPlus, Trash2, Shield, Users, CheckCircle, XCircle, AlertTriangle, Key } from 'lucide-react';
 
 export default function StaffManagement({ currentUser }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [newPasswordVal, setNewPasswordVal] = useState('');
   
   // New User Form States
   const [username, setUsername] = useState('');
@@ -111,6 +113,34 @@ export default function StaffManagement({ currentUser }) {
     } catch (err) {
       console.error('Error deleting user:', err);
       alert('เกิดข้อผิดพลาดในการส่งคำสั่งลบ');
+    }
+  };
+
+  const handleChangePassword = async (e, userId) => {
+    e.preventDefault();
+    if (!newPasswordVal.trim()) {
+      alert('กรุณากรอกรหัสผ่านใหม่');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/users/${userId}/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword: newPasswordVal.trim() })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        alert('เปลี่ยนรหัสผ่านสำเร็จเรียบร้อยแล้ว!');
+        setEditingUserId(null);
+        setNewPasswordVal('');
+      } else {
+        alert(data.error || 'เปลี่ยนรหัสผ่านไม่สำเร็จ');
+      }
+    } catch (err) {
+      console.error('Error changing password:', err);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
     }
   };
 
@@ -267,13 +297,44 @@ export default function StaffManagement({ currentUser }) {
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                       Username: <strong>{u.username}</strong>
                     </div>
+                    {editingUserId === u.id && (
+                      <form onSubmit={(e) => handleChangePassword(e, u.id)} style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem', width: '260px' }}>
+                        <input
+                          type="password"
+                          placeholder="กรอกรหัสผ่านใหม่"
+                          className="form-control"
+                          style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem', height: 'auto', flex: 1, border: '1px solid var(--accent-green)' }}
+                          value={newPasswordVal}
+                          onChange={(e) => setNewPasswordVal(e.target.value)}
+                          autoFocus
+                          required
+                        />
+                        <button type="submit" className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}>บันทึก</button>
+                        <button type="button" className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => setEditingUserId(null)}>ยกเลิก</button>
+                      </form>
+                    )}
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <span className={`badge ${u.role === 'manager' ? 'badge-success' : 'badge-simulated'}`}>
                     {u.role === 'manager' ? 'ผู้จัดการ (Manager)' : 'พนักงาน (Staff)'}
                   </span>
+                  
+                  {editingUserId !== u.id && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-icon-only"
+                      onClick={() => {
+                        setEditingUserId(u.id);
+                        setNewPasswordVal('');
+                      }}
+                      title="เปลี่ยนรหัสผ่าน"
+                      style={{ padding: '0.35rem' }}
+                    >
+                      <Key size={14} />
+                    </button>
+                  )}
                   
                   {u.username !== 'manager' && u.username !== currentUser.username && (
                     <button
@@ -281,6 +342,7 @@ export default function StaffManagement({ currentUser }) {
                       className="btn btn-danger btn-icon-only"
                       onClick={() => handleDeleteUser(u.id, u.username)}
                       title="ลบบัญชีผู้ใช้นี้"
+                      style={{ padding: '0.35rem' }}
                     >
                       <Trash2 size={16} />
                     </button>
