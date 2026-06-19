@@ -1,0 +1,16 @@
+[
+  {
+    "id": "user-1",
+    "username": "manager",
+    "password": "1234",
+    "name": "ผู้จัดการร้าน",
+    "role": "manager"
+  },
+  {
+    "id": "user-2",
+    "username": "staff",
+    "password": "1234",
+    "name": "พนักงานทั่วไป",
+    "role": "staff"
+  }
+]

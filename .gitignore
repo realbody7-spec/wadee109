@@ -1,0 +1,21 @@
+# Google / System files
+.DS_Store
+Thumbs.db
+
+# Dependency directories
+node_modules/
+frontend/node_modules/
+
+# Local configuration / Environment variables
+.env
+.env.local
+
+# Build outputs
+frontend/dist/
+
+# Local database files (optional: keep if you want default mock data, otherwise ignore)
+# backend/data/*.json
+
+# Ignore user uploaded receipt images but keep the uploads folder structure
+backend/public/uploads/*
+!backend/public/uploads/.gitkeep

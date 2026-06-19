@@ -1,0 +1,11 @@
+{
+  "simulationMode": true,
+  "lineNotifyToken": "",
+  "lineChannelAccessToken": "",
+  "lineUserId": "",
+  "lineChannelSecret": "",
+  "googleSheetWebhookUrl": "",
+  "driveFolderId": "",
+  "messengerPageAccessToken": "",
+  "messengerRecipientId": ""
+}
