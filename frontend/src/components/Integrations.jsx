@@ -550,7 +550,15 @@ function doPost(e) {
       newRow.push('');
     }
     
-    var nextRow = sheet.getLastRow() + 1;
+    var nextRow = getLastDataRow(sheet) + 1;
+    if (nextRow < 4) {
+      nextRow = 4;
+    }
+    
+    var maxRows = sheet.getMaxRows();
+    if (nextRow > maxRows) {
+      sheet.insertRowsAfter(maxRows, 1);
+    }
     
     newRow[0] = new Date(data.date || new Date());
     newRow[1] = data.cost || 0;
@@ -586,7 +594,7 @@ function doPost(e) {
       newRow[checkColIndex - 1] = "=" + receivedLetter + nextRow + "=" + netLetter + nextRow;
     }
     
-    sheet.appendRow(newRow);
+    sheet.getRange(nextRow, 1, 1, newRow.length).setValues([newRow]);
     
     return ContentService.createTextOutput(JSON.stringify({
       success: true, 
@@ -599,6 +607,16 @@ function doPost(e) {
       error: err.toString()
     })).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function getLastDataRow(sheet) {
+  var values = sheet.getRange("A1:A").getValues();
+  for (var i = values.length - 1; i >= 0; i--) {
+    if (values[i][0] !== "" && values[i][0] !== null && values[i][0] !== undefined) {
+      return i + 1;
+    }
+  }
+  return 3;
 }
 
 function getColumnLetter(colIndex) {
