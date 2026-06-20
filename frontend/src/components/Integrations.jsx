@@ -479,7 +479,7 @@ function doPost(e) {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     
     // ตรวจสอบว่าแผ่นงานมีหัวตารางคอลัมน์แล้วหรือยัง หากไม่มีให้สร้างอัตโนมัติ
-    if (sheet.getLastColumn() < 5) {
+    if (sheet.getLastColumn() < 3) {
       setupSheetTemplate(sheet);
     }
     
@@ -500,7 +500,7 @@ function doPost(e) {
     var itemNameLower = (data.name || '').trim().toLowerCase();
     
     // 1. ค้นหาแบบตรงตัวก่อน (Exact Match)
-    for (var i = 5; i < columns.length; i++) {
+    for (var i = 3; i < columns.length; i++) {
       if (columns[i] && columns[i].toString().trim().toLowerCase() === itemNameLower) {
         colIndex = i + 1;
         break;
@@ -509,7 +509,7 @@ function doPost(e) {
     
     // 2. ค้นหาแบบใกล้เคียงหากไม่เจอตรงตัว (Partial Match)
     if (colIndex === -1 && itemNameLower) {
-      for (var i = 5; i < columns.length; i++) {
+      for (var i = 3; i < columns.length; i++) {
         if (columns[i]) {
           var headerLower = columns[i].toString().trim().toLowerCase();
           if (itemNameLower.indexOf(headerLower) !== -1 || headerLower.indexOf(itemNameLower) !== -1) {
@@ -522,7 +522,7 @@ function doPost(e) {
     
     // 3. หากยังไม่พบอีก ให้หาช่อง 'อื่นๆ'
     if (colIndex === -1) {
-      for (var i = 5; i < columns.length; i++) {
+      for (var i = 3; i < columns.length; i++) {
         if (columns[i] && columns[i].toString().trim() === 'อื่นๆ') {
           colIndex = i + 1;
           break;
@@ -537,18 +537,16 @@ function doPost(e) {
     }
     
     newRow[0] = new Date(data.date || new Date());
-    newRow[1] = data.billNumber || '-';
-    newRow[2] = data.cost || 0;
-    newRow[3] = data.name;
-    newRow[4] = data.quantity || 0;
+    newRow[1] = data.cost || 0;
+    newRow[2] = data.quantity || 0;
     
-    // ใส่จำนวนเงิน (หรือจำนวนสินค้า) ไปในคอลัมน์ที่ถูกต้อง
+    // ใส่ราคาวัตถุดิบลงในคอลัมน์สินค้าที่ถูกต้อง
     if (colIndex !== -1 && colIndex <= lastCol) {
-      newRow[colIndex - 1] = data.quantity || 0;
+      newRow[colIndex - 1] = data.cost || 0;
     }
     
     // ใส่ลิงก์รูปภาพในคอลัมน์สุดท้าย
-    for (var i = 5; i < columns.length; i++) {
+    for (var i = 3; i < columns.length; i++) {
       if (columns[i] && columns[i].toString().trim() === 'รูปภาพบิล') {
         newRow[i] = driveFileUrl;
         break;
@@ -573,10 +571,10 @@ function doPost(e) {
 function setupSheetTemplate(sheet) {
   sheet.clear();
   
-  // 1. กำหนดหัวตารางหลัก A-E
-  var row1 = ['วันที่สั่งซื้อ', 'เลขสินค้า ค่าสั่งซื้อ', 'ยอดรวมบิล', 'รายการ', 'จำนวน'];
-  var row2 = ['', '', '', '', ''];
-  var row3 = ['', '', '', '', ''];
+  // 1. กำหนดหัวตารางหลัก A-C
+  var row1 = ['วันที่สั่งซื้อ', 'ยอดรวมบิล', 'จำนวน'];
+  var row2 = ['', '', ''];
+  var row3 = ['', '', ''];
   
   var schema = [
     { category: 'เครื่องครัว/ของแห้ง', color: '#d9e1f2', items: ['น้ำตาลปี๊บ', 'น้ำตาลทราย', 'งาขาว', 'ชูรส', 'น้ำปลา', 'น้ำส้มสายชู', 'น้ำปลาร้า', 'น้ำมัน', 'น้ำมันงา', 'ซอสมะเขือ', 'ซอสพริก', 'มายองเนส', 'น้ำจิ้มบ๊วย', 'ซอสสูตร5', 'ซอสหอยนางรม', 'ซีอิ๊วฉลากแดง', 'ซีอิ๊วขาว สูตร1', 'ซอสฝาเขียว', 'เบกกิ้งโซดา', 'ไวไว', 'มาม่า', 'หมี่หยก', 'วุ้นเส้น', 'ข้าวสาร', 'ข้าวคั่ว', 'ผงมะนาว', 'กระเทียมดอง', 'น้ำมะขาม', 'พริกป่น', 'โชยุ', 'วาซาบิ', 'เกลือ', 'น้ำยาล้างจาน', 'ผงซักฟอก', 'ถุงขยะ 18*20', 'ถุงหิ้ว 12*26', 'ถุงร้อน 8*12', 'ถุงหิ้ว 8*16', 'ไข่ไก่', 'เต้าหู้ไข่'] },
@@ -599,12 +597,12 @@ function setupSheetTemplate(sheet) {
     { category: 'ภาพถ่ายบิล', color: '#ffffff', items: ['รูปภาพบิล'] }
   ];
 
-  var colIndex = 6;
+  var colIndex = 4;
   var mergeRangesRow2 = [];
   var verticalMergeCols = [];
   
   // หาจำนวนคอลัมน์ของกลุ่มวัตถุดิบ (COGS)
-  var cogsEndCol = 5;
+  var cogsEndCol = 3;
   for (var i = 0; i <= 8; i++) {
     cogsEndCol += schema[i].items.length;
   }
@@ -659,14 +657,14 @@ function setupSheetTemplate(sheet) {
   sheet.getRange(2, 1, 1, totalCols).setValues([row2]);
   sheet.getRange(3, 1, 1, totalCols).setValues([row3]);
   
-  // ยุบรวมแนวตั้งสำหรับคอลัมน์ A-E (วันที่สั่งซื้อ, เลขบิล, ยอดรวม, รายการ, จำนวน)
-  for (var c = 1; c <= 5; c++) {
+  // ยุบรวมแนวตั้งสำหรับคอลัมน์ A-C (วันที่สั่งซื้อ, ยอดรวมบิล, จำนวน)
+  for (var c = 1; c <= 3; c++) {
     sheet.getRange(1, c, 3, 1).merge();
   }
   
   // ยุบรวมแถวที่ 1 แนวนอน
-  // 1. กลุ่มวัตถุดิบ (คอลัมน์ F ถึง cogsEndCol)
-  var cogsRange = sheet.getRange(1, 6, 1, cogsEndCol - 6 + 1);
+  // 1. กลุ่มวัตถุดิบ (คอลัมน์ D ถึง cogsEndCol)
+  var cogsRange = sheet.getRange(1, 4, 1, cogsEndCol - 4 + 1);
   cogsRange.merge();
   cogsRange.setBackground('#00ff00'); // สีเขียวสว่าง
   
@@ -706,7 +704,7 @@ function setupSheetTemplate(sheet) {
   
   // ตรึงแถวและคอลัมน์
   sheet.setFrozenRows(3);
-  sheet.setFrozenColumns(5);
+  sheet.setFrozenColumns(3);
   
   // จัดความกว้างคอลัมน์อัตโนมัติ
   for (var col = 1; col <= totalCols; col++) {
