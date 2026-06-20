@@ -530,11 +530,27 @@ function doPost(e) {
       }
     }
     
+    // ค้นหาคอลัมน์คีย์เพิ่มเติม
+    var discountColIndex = -1;
+    var netPriceColIndex = -1;
+    var receivedColIndex = -1;
+    var checkColIndex = -1;
+    
+    for (var i = 3; i < columns.length; i++) {
+      var colName = columns[i].toString().trim();
+      if (colName === 'ส่วนลด') discountColIndex = i + 1;
+      else if (colName === 'ราคาสุทธิ') netPriceColIndex = i + 1;
+      else if (colName === 'รับเงินแล้ว') receivedColIndex = i + 1;
+      else if (colName === 'ตรวจสอบ') checkColIndex = i + 1;
+    }
+    
     // สร้างแถวข้อมูลใหม่และเติมค่าเริ่มต้น
     var newRow = [];
     for (var i = 0; i < lastCol; i++) {
       newRow.push('');
     }
+    
+    var nextRow = sheet.getLastRow() + 1;
     
     newRow[0] = new Date(data.date || new Date());
     newRow[1] = data.cost || 0;
@@ -553,6 +569,23 @@ function doPost(e) {
       }
     }
     
+    // ใส่ค่าและสูตรสำหรับ ส่วนลด, ราคาสุทธิ, รับเงินแล้ว, ตรวจสอบ
+    if (discountColIndex !== -1) {
+      newRow[discountColIndex - 1] = data.discount || 0;
+    }
+    if (netPriceColIndex !== -1) {
+      var discountLetter = getColumnLetter(discountColIndex);
+      newRow[netPriceColIndex - 1] = "=B" + nextRow + "-" + discountLetter + nextRow;
+    }
+    if (receivedColIndex !== -1) {
+      newRow[receivedColIndex - 1] = data.received !== undefined ? data.received : (data.cost || 0) - (data.discount || 0);
+    }
+    if (checkColIndex !== -1) {
+      var netLetter = getColumnLetter(netPriceColIndex);
+      var receivedLetter = getColumnLetter(receivedColIndex);
+      newRow[checkColIndex - 1] = "=" + receivedLetter + nextRow + "=" + netLetter + nextRow;
+    }
+    
     sheet.appendRow(newRow);
     
     return ContentService.createTextOutput(JSON.stringify({
@@ -566,6 +599,24 @@ function doPost(e) {
       error: err.toString()
     })).setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+function getColumnLetter(colIndex) {
+  var temp, letter = "";
+  while (colIndex > 0) {
+    temp = (colIndex - 1) % 26;
+    letter = String.fromCharCode(65 + temp) + letter;
+    colIndex = (colIndex - temp - 1) / 26;
+  }
+  return letter;
+}
+
+function getThaiMonthYear() {
+  var months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  var d = new Date();
+  var month = months[d.getMonth()];
+  var year = d.getFullYear();
+  return month + " ." + year;
 }
 
 function setupSheetTemplate(sheet) {
@@ -644,12 +695,17 @@ function setupSheetTemplate(sheet) {
     colIndex += numItems;
   }
   
+  // เพิ่มคอลัมน์ข้อมูลเพิ่มเติมต่อท้ายภาพถ่ายบิล
+  row1.push('ส่วนลด', 'ราคาสุทธิ', 'รับเงินแล้ว', 'ตรวจสอบ');
+  row2.push('', '', '', '');
+  row3.push('', '', '', '');
+  
   var totalCols = row1.length;
   
-  // ตรวจสอบและเพิ่มคอลัมน์ให้เพียงพอกับขนาดหัวตาราง (ป้องกันข้อผิดพลาด Range out of bounds)
+  // ตรวจสอบและเพิ่มคอลัมน์ให้เพียงพอกับขนาดหัวตาราง
   var maxCols = sheet.getMaxColumns();
-  if (maxCols < totalCols) {
-    sheet.insertColumnsAfter(maxCols, totalCols - maxCols);
+  if (maxCols < totalCols + 3) {
+    sheet.insertColumnsAfter(maxCols, (totalCols + 3) - maxCols);
   }
   
   // เขียนข้อมูลลงในชีตทีเดียว 3 แถว
@@ -662,14 +718,19 @@ function setupSheetTemplate(sheet) {
     sheet.getRange(1, c, 3, 1).merge();
   }
   
+  // ยุบรวมแนวตั้งสำหรับ ส่วนลด, ราคาสุทธิ, รับเงินแล้ว, ตรวจสอบ
+  for (var c = colIndex; c < colIndex + 4; c++) {
+    sheet.getRange(1, c, 3, 1).merge();
+  }
+  
   // ยุบรวมแถวที่ 1 แนวนอน
   // 1. กลุ่มวัตถุดิบ (คอลัมน์ D ถึง cogsEndCol)
   var cogsRange = sheet.getRange(1, 4, 1, cogsEndCol - 4 + 1);
   cogsRange.merge();
   cogsRange.setBackground('#00ff00'); // สีเขียวสว่าง
   
-  // 2. กลุ่มค่าบริการ (คอลัมน์ cogsEndCol + 1 ถึงคอลัมน์สุดท้าย)
-  var serviceRange = sheet.getRange(1, cogsEndCol + 1, 1, totalCols - cogsEndCol);
+  // 2. กลุ่มค่าบริการ (คอลัมน์ cogsEndCol + 1 ถึงคอลัมน์สุดท้ายของภาพถ่ายบิล)
+  var serviceRange = sheet.getRange(1, cogsEndCol + 1, 1, colIndex - 1 - cogsEndCol);
   serviceRange.merge();
   serviceRange.setBackground('#00ffff'); // สีฟ้าไซแอน
   
@@ -696,6 +757,12 @@ function setupSheetTemplate(sheet) {
   headerRange.setHorizontalAlignment('center');
   headerRange.setVerticalAlignment('middle');
   headerRange.setBorder(true, true, true, true, true, true);
+  
+  // ตั้งสีหัวตารางคีย์เพิ่มเติม
+  sheet.getRange(1, colIndex, 3, 1).setBackground("#f2f2f2"); // ส่วนลด
+  sheet.getRange(1, colIndex + 1, 3, 1).setBackground("#00ffff"); // ราคาสุทธิ
+  sheet.getRange(1, colIndex + 2, 3, 1).setBackground("#f2f2f2"); // รับเงินแล้ว
+  sheet.getRange(1, colIndex + 3, 3, 1).setBackground("#f2f2f2"); // ตรวจสอบ
   
   // ตั้งค่าความสูงแถว
   sheet.setRowHeight(1, 30);
@@ -729,6 +796,96 @@ function setupSheetTemplate(sheet) {
   } catch (e) {
     // ข้ามหากไม่สามารถยุบได้
   }
+  
+  // ฟังก์ชันหาช่วงคอลัมน์และสูตรการรวมค่าของหมวดหมู่
+  function getRangeFormula(startIdx, endIdx) {
+    var sCol = 4;
+    for (var i = 0; i < startIdx; i++) {
+      sCol += schema[i].items.length;
+    }
+    var eCol = sCol;
+    for (var i = startIdx; i <= endIdx; i++) {
+      eCol += schema[i].items.length;
+    }
+    eCol = eCol - 1;
+    
+    var startLetter = getColumnLetter(sCol);
+    var endLetter = getColumnLetter(eCol);
+    return "=SUM(" + startLetter + "4:" + endLetter + ")";
+  }
+  
+  var discountLetter = getColumnLetter(colIndex);
+  var netLetter = getColumnLetter(colIndex + 1);
+  var receivedLetter = getColumnLetter(colIndex + 2);
+  var checkLetter = getColumnLetter(colIndex + 3);
+  
+  // กำหนดจัดฟอร์แมตข้อมูลอัตโนมัติสำหรับทั้งชีต
+  sheet.getRange("B4:B").setNumberFormat("#,##0.00");
+  sheet.getRange(discountLetter + "4:" + discountLetter).setNumberFormat("#,##0.00");
+  sheet.getRange(netLetter + "4:" + netLetter).setNumberFormat("#,##0.00");
+  sheet.getRange(receivedLetter + "4:" + receivedLetter).setNumberFormat("#,##0.00");
+  sheet.getRange(checkLetter + "4:" + checkLetter).setHorizontalAlignment("center");
+  
+  // --- การสร้างตารางสรุปด้านข้างสีเขียว (ER:ET ในแถว 4-21) ---
+  var summaryStartCol = colIndex + 4; // คอลัมน์ 148 (ER)
+  var summaryRows = [
+    ["เครื่องครัว/ของแห้ง", getRangeFormula(0, 0)],
+    ["ผัก", getRangeFormula(1, 1)],
+    ["เนื้อหมู / ไก่", getRangeFormula(2, 2)],
+    ["เนื้อวัว", getRangeFormula(3, 3)],
+    ["ทะเล", getRangeFormula(4, 4)],
+    ["ของทอด", getRangeFormula(5, 5)],
+    ["น้ำจิ้ม", getRangeFormula(6, 6)],
+    ["เครื่องดื่ม", getRangeFormula(7, 7)],
+    ["Asset", getRangeFormula(8, 8)],
+    ["เงินเดือน", getRangeFormula(9, 9)],
+    ["ค่าส่งของ", getRangeFormula(10, 10)],
+    ["น้ำแข็ง", getRangeFormula(11, 11)],
+    ["แก๊ส / ถ่าน", getRangeFormula(12, 13)],
+    ["ค่าน้ำ + ค่าไฟ + เน็ต", getRangeFormula(14, 14)],
+    ["การตลาด/ปรับปรุงร้าน", getRangeFormula(15, 15)],
+    ["ส่วนลด", "=SUM(" + discountLetter + "4:" + discountLetter + ")"]
+  ];
+  
+  // 1. หัวตารางสรุป
+  sheet.getRange(4, summaryStartCol, 1, 2).merge().setValue("สรุปรายจ่าย " + getThaiMonthYear());
+  sheet.getRange(4, summaryStartCol + 2).setValue("% ของรายจ่าย");
+  
+  // 2. เติมข้อมูลแถวในตารางสรุป
+  for (var idx = 0; idx < summaryRows.length; idx++) {
+    var rNum = 5 + idx; // แถว 5 ถึง 20
+    sheet.getRange(rNum, summaryStartCol).setValue(summaryRows[idx][0]);
+    sheet.getRange(rNum, summaryStartCol + 1).setFormula(summaryRows[idx][1]);
+    sheet.getRange(rNum, summaryStartCol + 2).setFormula("=ES" + rNum + "/$ES$21");
+  }
+  
+  // 3. แถว Total สรุปผลลัพธ์
+  var totalRowNum = 5 + summaryRows.length; // แถว 21
+  sheet.getRange(totalRowNum, summaryStartCol).setValue("Total");
+  sheet.getRange(totalRowNum, summaryStartCol + 1).setFormula("=SUM(ES5:ES" + (totalRowNum - 1) + ")");
+  sheet.getRange(totalRowNum, summaryStartCol + 2).setFormula("=SUM(ET5:ET" + (totalRowNum - 1) + ")");
+  
+  // 4. สไตล์ตารางสรุป (สีพื้นหลังเขียวสดใส, สไตล์ตัวอักษร, เส้นขอบ)
+  var summaryTableRange = sheet.getRange(4, summaryStartCol, summaryRows.length + 2, 3);
+  summaryTableRange.setBackground("#00ff00");
+  summaryTableRange.setFontColor("#000000");
+  summaryTableRange.setBorder(true, true, true, true, true, true);
+  
+  var summaryHeaderRange = sheet.getRange(4, summaryStartCol, 1, 3);
+  summaryHeaderRange.setFontWeight("bold");
+  summaryHeaderRange.setHorizontalAlignment("center");
+  
+  var summaryTotalRange = sheet.getRange(totalRowNum, summaryStartCol, 1, 3);
+  summaryTotalRange.setFontWeight("bold");
+  
+  // จัดประเภทตัวเลขในตารางสรุป
+  sheet.getRange(5, summaryStartCol + 1, summaryRows.length + 1, 1).setNumberFormat("#,##0.00");
+  sheet.getRange(5, summaryStartCol + 2, summaryRows.length + 1, 1).setNumberFormat("0.00%");
+  
+  // ปรับความกว้างคอลัมน์สรุป
+  sheet.autoResizeColumn(summaryStartCol);
+  sheet.autoResizeColumn(summaryStartCol + 1);
+  sheet.autoResizeColumn(summaryStartCol + 2);
 }`}
                 onClick={(e) => {
                   e.target.select();
