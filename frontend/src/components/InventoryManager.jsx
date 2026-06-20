@@ -18,6 +18,26 @@ import {
   PieChart
 } from 'lucide-react';
 
+const schemaData = {
+  "เครื่องครัว/ของแห้ง": ['น้ำตาลปี๊บ', 'น้ำตาลทราย', 'งาขาว', 'ชูรส', 'น้ำปลา', 'น้ำส้มสายชู', 'น้ำปลาร้า', 'น้ำมัน', 'น้ำมันงา', 'ซอสมะเขือ', 'ซอสพริก', 'มายองเนส', 'น้ำจิ้มบ๊วย', 'ซอสสูตร5', 'ซอสหอยนางรม', 'ซีอิ๊วฉลากแดง', 'ซีอิ๊วขาว สูตร1', 'ซอสฝาเขียว', 'เบกกิ้งโซดา', 'ไวไว', 'มาม่า', 'หมี่หยก', 'วุ้นเส้น', 'ข้าวสาร', 'ข้าวคั่ว', 'ผงมะนาว', 'กระเทียมดอง', 'น้ำมะขาม', 'พริกป่น', 'โชยุ', 'วาซาบิ', 'เกลือ', 'น้ำยาล้างจาน', 'ผงซักฟอก', 'ถุงขยะ 18*20', 'ถุงหิ้ว 12*26', 'ถุงร้อน 8*12', 'ถุงหิ้ว 8*16', 'ไข่ไก่', 'เต้าหู้ไข่'],
+  "ผัก": ['กะหล่ำ', 'เห็ดเข็ม', 'แครอท', 'ผักบุ้ง', 'ข้าวโพด', 'ต้นหอม', 'ผักชี', 'ตั้งโอ๋', 'กระเทียม', 'กระเทียมเจียว', 'พริกไทย', 'พริกเขียว', 'พริกแดง', 'กุ้งแห้ง', 'มะละกอ', 'มะนาว', 'หอมใหญ่', 'หอมแดง', 'มะเขือเทศ', 'ถั่วฝักยาว', 'ถั่วตำไทย', 'ใบกะเพรา', 'ข่า', 'ตะไคร้', 'ใบมะกรูด', 'ผักชีใบเลื่อย', 'โหระพา', 'ใบเตย', 'เม็ดมะม่วง'],
+  "เนื้อหมู / ไก่": ['เนื้อหมู', 'สามชั้น', 'สันคอ', 'หมูสับ', 'ตับ', 'เบคอน', 'เอ็นไก่', 'ปีกไก่', 'มันหมูเจียว', 'กระดูกหมู', 'สะโพกหมู', 'มันก้อน'],
+  "เนื้อวัว": ['สันคอ', 'เสือ', 'สันใน', 'เนื้อออส', 'ผ้าขี้ริ้ว', 'สามชั้น', 'สันนอก'],
+  "ทะเล": ['หมึกสด', 'หมึกหมูกะทะ', 'หมึกกรอบ', 'กุ้ง', 'กุ้ง หมูกะทะ', 'ปูอัด', 'เต้าหู้ปลา', 'กะพรุน'],
+  "ของทอด": ['เกี๊ยวซ่า', 'เฟรนฟราย', 'นักเก็ต', 'ไก่กรอบ', 'แป้งทอดกรอบ', 'เอโร่ อิบิโรลไส้กุ้งแช่แข็ง', 'เต้าหู้ชีส'],
+  "น้ำจิ้ม": ['วดี', 'BBQ'],
+  "เครื่องดื่ม": ['น้ำอัดลม', 'โซดา', 'น้ำเปล่า', 'หลอดน้ำงอ', 'เบียร์ช้าง', 'เบียร์ลีโอ', 'เบียร์สิงห์', 'รีแบน', 'รีกลม', 'ขนมหวาน', 'ไอติม'],
+  "Asset": ['แปรงขัดกระทะ', 'สเปรย์กำจัดแมลง', 'กาวดักแมลงวัน', 'น้ำยาถูพื้น', 'น้ำยาล้างจาน', 'ล้างห้องน้ำ', 'สบู่ล้างมือ', 'น้ำยาเช็ดโต๊ะ', 'ทิชชู่', 'หลอดงอ', 'ตะเกียบไม้', 'กระดาษความร้อน', 'อื่นๆ'],
+  "เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน": ['เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน'],
+  "ค่าส่งของ": ['ค่าส่งของ'],
+  "น้ำแข็ง": ['หลอด', 'บด'],
+  "แก๊ส": ['แก๊ส'],
+  "ถ่าน": ['ถ่าน'],
+  "ค่าน้ำ + ค่าไฟ + เน็ต": ['ค่าน้ำ + ค่าไฟ + เน็ต'],
+  "การตลาด/ปรับปรุงร้าน": ['การตลาด/ปรับปรุงร้าน'],
+  "ค่าบริการ": ['ค่าบริการ']
+};
+
 export default function InventoryManager({ role = 'manager', filterName = '', setFilterName = () => {} }) {
   const [subTab, setSubTab] = useState('intake'); // 'intake' | 'pos' | 'reconciliation'
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -28,7 +48,7 @@ export default function InventoryManager({ role = 'manager', filterName = '', se
 
   // Form states
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('meat');
+  const [category, setCategory] = useState('เครื่องครัว/ของแห้ง');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('kg');
   const [cost, setCost] = useState('');
@@ -50,12 +70,24 @@ export default function InventoryManager({ role = 'manager', filterName = '', se
 
   // Categories helper
   const categories = {
-    meat: { label: 'เนื้อสัตว์', color: 'var(--accent-amber)', badgeClass: 'badge-opening' },
-    seafood: { label: 'อาหารทะเล', color: 'var(--accent-blue)', badgeClass: 'badge-bar' },
-    vegetables: { label: 'ผัก', color: 'var(--accent-green)', badgeClass: 'badge-kitchen' },
-    dry_goods: { label: 'ของแห้ง/เครื่องปรุง', color: 'var(--accent-purple)', badgeClass: 'badge-closing' },
-    dairy: { label: 'ผลิตภัณฑ์นม/เนย', color: 'var(--accent-pink)', badgeClass: 'badge-shift_handover' },
-    others: { label: 'อื่นๆ', color: 'var(--text-muted)', badgeClass: 'badge-cleaning' }
+    "เครื่องครัว/ของแห้ง": { label: 'เครื่องครัว/ของแห้ง', color: 'var(--accent-purple)', badgeClass: 'badge-closing' },
+    "ผัก": { label: 'ผัก', color: 'var(--accent-green)', badgeClass: 'badge-kitchen' },
+    "เนื้อหมู / ไก่": { label: 'เนื้อหมู / ไก่', color: 'var(--accent-amber)', badgeClass: 'badge-opening' },
+    "เนื้อวัว": { label: 'เนื้อวัว', color: 'var(--accent-pink)', badgeClass: 'badge-shift_handover' },
+    "ทะเล": { label: 'ทะเล', color: 'var(--accent-blue)', badgeClass: 'badge-bar' },
+    "ของทอด": { label: 'ของทอด', color: 'var(--accent-orange)', badgeClass: 'badge-cleaning' },
+    "น้ำจิ้ม": { label: 'น้ำจิ้ม', color: 'var(--accent-purple)', badgeClass: 'badge-opening' },
+    "เครื่องดื่ม": { label: 'เครื่องดื่ม', color: 'var(--accent-amber)', badgeClass: 'badge-bar' },
+    "Asset": { label: 'Asset', color: 'var(--text-muted)', badgeClass: 'badge-cleaning' },
+    "เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน": { label: 'เงินเดือน', color: 'var(--text-muted)', badgeClass: 'badge-closing' },
+    "ค่าส่งของ": { label: 'ค่าส่งของ', color: 'var(--text-muted)', badgeClass: 'badge-shift_handover' },
+    "น้ำแข็ง": { label: 'น้ำแข็ง', color: 'var(--text-muted)', badgeClass: 'badge-bar' },
+    "แก๊ส": { label: 'แก๊ส', color: 'var(--text-muted)', badgeClass: 'badge-kitchen' },
+    "ถ่าน": { label: 'ถ่าน', color: 'var(--text-muted)', badgeClass: 'badge-bar' },
+    "ค่าน้ำ + ค่าไฟ + เน็ต": { label: 'ค่าน้ำ/ไฟ/เน็ต', color: 'var(--text-muted)', badgeClass: 'badge-closing' },
+    "การตลาด/ปรับปรุงร้าน": { label: 'การตลาด', color: 'var(--text-muted)', badgeClass: 'badge-opening' },
+    "ค่าบริการ": { label: 'ค่าบริการ', color: 'var(--text-muted)', badgeClass: 'badge-shift_handover' },
+    "others": { label: 'อื่นๆ', color: 'var(--text-muted)', badgeClass: 'badge-cleaning' }
   };
 
   useEffect(() => {
@@ -69,6 +101,14 @@ export default function InventoryManager({ role = 'manager', filterName = '', se
       setSubTab('intake');
     }
   }, [role]);
+
+  useEffect(() => {
+    if (schemaData[category] && schemaData[category].length > 0) {
+      setName(schemaData[category][0]);
+    } else {
+      setName('');
+    }
+  }, [category]);
 
   const fetchInventory = async () => {
     try {
@@ -409,14 +449,17 @@ export default function InventoryManager({ role = 'manager', filterName = '', se
 
             <div className="form-group">
               <label>ชื่อวัตถุดิบ <span style={{ color: 'var(--accent-danger)' }}>*</span></label>
-              <input 
-                type="text" 
+              <select 
                 className="form-control" 
-                placeholder="เช่น หมูสามชั้น, เนื้อแซลมอน" 
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
                 required 
-              />
+              >
+                <option value="">-- เลือกรายการวัตถุดิบ --</option>
+                {(schemaData[category] || []).map(item => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
