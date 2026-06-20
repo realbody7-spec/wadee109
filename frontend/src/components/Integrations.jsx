@@ -648,6 +648,12 @@ function setupSheetTemplate(sheet) {
   
   var totalCols = row1.length;
   
+  // ตรวจสอบและเพิ่มคอลัมน์ให้เพียงพอกับขนาดหัวตาราง (ป้องกันข้อผิดพลาด Range out of bounds)
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols < totalCols) {
+    sheet.insertColumnsAfter(maxCols, totalCols - maxCols);
+  }
+  
   // เขียนข้อมูลลงในชีตทีเดียว 3 แถว
   sheet.getRange(1, 1, 1, totalCols).setValues([row1]);
   sheet.getRange(2, 1, 1, totalCols).setValues([row2]);
