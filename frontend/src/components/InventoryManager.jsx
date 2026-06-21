@@ -38,7 +38,7 @@ const schemaData = {
   "ค่าบริการ": ['ค่าบริการ']
 };
 
-export default function InventoryManager({ role = 'manager', filterName = '', setFilterName = () => {} }) {
+export default function InventoryManager({ role = 'admin', filterName = '', setFilterName = () => {} }) {
   const [subTab, setSubTab] = useState('intake'); // 'intake' | 'pos' | 'reconciliation'
   const [inventoryItems, setInventoryItems] = useState([]);
   const [posSales, setPosSales] = useState([]);
@@ -384,7 +384,7 @@ export default function InventoryManager({ role = 'manager', filterName = '', se
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
       {/* Sub Tabs menu */}
-      {role === 'manager' && (
+      {(role === 'admin' || role === 'manager') && (
         <div className="alert-bar" style={{ padding: '0.5rem 1rem', background: 'var(--bg-secondary)', marginBottom: '0' }}>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button 
@@ -712,7 +712,7 @@ export default function InventoryManager({ role = 'manager', filterName = '', se
                         </span>
                       </div>
 
-                      {role === 'manager' && (
+                      {(role === 'admin' || role === 'manager') && (
                         <button 
                           className="btn btn-danger btn-icon-only" 
                           onClick={() => handleDeleteInventory(item.id)}

@@ -1,10 +1,10 @@
 [
   {
     "id": "user-1",
-    "username": "manager",
+    "username": "admin",
     "password": "1234",
-    "name": "ผู้จัดการร้าน",
-    "role": "manager"
+    "name": "ผู้ดูแลระบบ",
+    "role": "admin"
   },
   {
     "id": "user-2",

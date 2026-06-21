@@ -13,7 +13,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-export default function Dashboard({ sops, schedules, logs, settings, onTriggerSchedule, setView, inventory = [], reconciliation = [], role = 'manager', setInventoryFilterName }) {
+export default function Dashboard({ sops, schedules, logs, settings, onTriggerSchedule, setView, inventory = [], reconciliation = [], role = 'admin', setInventoryFilterName }) {
   // Count statistics
   const activeSchedulesCount = schedules.filter(s => s.active).length;
   const totalSops = sops.length;
@@ -79,7 +79,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
             </p>
           </div>
         </div>
-        {role === 'manager' && (
+        {role === 'admin' && (
           <button className="btn btn-secondary" onClick={() => setView('integrations')}>
             ตั้งค่าการเชื่อมต่อ
           </button>
@@ -132,17 +132,17 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
       </div>
 
       {/* Inventory & POS Reconciliation Section (50/50 split or full-width) */}
-      <div className={role === 'manager' ? "dashboard-grid" : ""}>
+      <div className={(role === 'admin' || role === 'manager') ? "dashboard-grid" : ""}>
         {/* Recent Purchases / Inbound Orders */}
         <div className="card card-accent-amber" style={role === 'staff' ? { width: '100%' } : {}}>
           <div className="card-title-row">
             <h2>รายการรับเข้าวัตถุดิบ / สั่งซื้อล่าสุด</h2>
             <button className="btn btn-secondary" onClick={() => setView('inventory')}>
-              {role === 'manager' ? 'จัดการคลัง' : 'บันทึกวัตถุดิบ'}
+              {(role === 'admin' || role === 'manager') ? 'จัดการคลัง' : 'บันทึกวัตถุดิบ'}
             </button>
           </div>
 
-          {role === 'manager' && categoryBreakdown.length > 0 && (
+          {(role === 'admin' || role === 'manager') && categoryBreakdown.length > 0 && (
             <div 
               style={{ marginBottom: '1.25rem', padding: '1rem', background: 'rgba(0,0,0,0.015)', borderRadius: '12px', border: '1px solid var(--border-card)', cursor: 'pointer' }}
               onClick={() => setView('inventory')}
@@ -218,7 +218,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
         </div>
 
         {/* POS Sales Reconciliation Summary */}
-        {role === 'manager' && (
+        {(role === 'admin' || role === 'manager') && (
           <div className="card card-accent-green">
             <div className="card-title-row">
               <h2>สรุปการกระทบยอดขายจริง vs คลังวัตถุดิบ</h2>
@@ -341,7 +341,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
         <div className="card card-accent-blue">
           <div className="card-title-row">
             <h2>ตารางแจ้งเตือนความคืบหน้า</h2>
-            {role === 'manager' && (
+            {(role === 'admin' || role === 'manager') && (
               <button className="btn btn-secondary btn-icon-only" onClick={() => setView('scheduler')} title="แก้ไขตารางเวลา">
                 <CalendarDays size={18} />
               </button>
@@ -373,7 +373,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
                     </span>
                   </div>
 
-                  {role === 'manager' && (
+                  {(role === 'admin' || role === 'manager') && (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button 
                         className="btn btn-secondary btn-icon-only" 
@@ -394,7 +394,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
         <div className="card card-accent-purple">
           <div className="card-title-row">
             <h2>ประวัติการยิงการเตือนล่าสุด</h2>
-            {role === 'manager' && (
+            {role === 'admin' && (
               <button className="btn btn-secondary" onClick={() => setView('logs')}>
                 ดูทั้งหมด
               </button>

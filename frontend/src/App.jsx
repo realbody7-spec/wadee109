@@ -365,15 +365,15 @@ export default function App() {
           <div className="role-switcher-card" style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-sidebar)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ผู้ใช้งาน:</div>
             <div style={{ fontWeight: '700', color: '#ffffff', fontSize: '0.95rem', marginTop: '0.15rem' }}>{currentUser.name}</div>
-            <div style={{ fontSize: '0.8rem', color: role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
-              <span className="status-dot" style={{ width: '6px', height: '6px', backgroundColor: role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)', boxShadow: 'none', animation: 'none' }}></span>
-              <span>{role === 'manager' ? 'ผู้จัดการร้าน' : 'พนักงาน'}</span>
+            <div style={{ fontSize: '0.8rem', color: role === 'admin' ? 'var(--accent-danger)' : role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
+              <span className="status-dot" style={{ width: '6px', height: '6px', backgroundColor: role === 'admin' ? 'var(--accent-danger)' : role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)', boxShadow: 'none', animation: 'none' }}></span>
+              <span>{role === 'admin' ? 'ผู้ดูแลระบบ' : role === 'manager' ? 'ผู้จัดการร้าน' : 'พนักงาน'}</span>
             </div>
           </div>
         )}
 
         <ul className="sidebar-menu">
-          {role === 'manager' && (
+          {(role === 'admin' || role === 'manager') && (
             <li className={`menu-item ${view === 'dashboard' ? 'active' : ''}`}>
               <button onClick={() => { setInventoryFilterName(''); setView('dashboard'); }}>
                 <LayoutDashboard size={20} className="icon" />
@@ -382,7 +382,7 @@ export default function App() {
             </li>
           )}
           
-          {role === 'manager' && (
+          {(role === 'admin' || role === 'manager') && (
             <>
               <li className={`menu-item ${view === 'sops' ? 'active' : ''}`}>
                 <button onClick={() => { setInventoryFilterName(''); setView('sops'); }}>
@@ -402,18 +402,21 @@ export default function App() {
           <li className={`menu-item ${view === 'inventory' ? 'active' : ''}`}>
             <button onClick={() => { setInventoryFilterName(''); setView('inventory'); }}>
               <ClipboardList size={20} className="icon" />
-              <span>{role === 'manager' ? 'คลังวัตถุดิบและยอดขาย POS' : 'บันทึกนำเข้าจัดซื้อวัตถุดิบ'}</span>
+              <span>{(role === 'admin' || role === 'manager') ? 'คลังวัตถุดิบและยอดขาย POS' : 'บันทึกนำเข้าจัดซื้อวัตถุดิบ'}</span>
             </button>
           </li>
 
-          {role === 'manager' && (
+          {(role === 'admin' || role === 'manager') && (
+            <li className={`menu-item ${view === 'staff_management' ? 'active' : ''}`}>
+              <button onClick={() => { setInventoryFilterName(''); setView('staff_management'); }}>
+                <Users size={20} className="icon" />
+                <span>จัดการบัญชีพนักงาน</span>
+              </button>
+            </li>
+          )}
+
+          {role === 'admin' && (
             <>
-              <li className={`menu-item ${view === 'staff_management' ? 'active' : ''}`}>
-                <button onClick={() => { setInventoryFilterName(''); setView('staff_management'); }}>
-                  <Users size={20} className="icon" />
-                  <span>จัดการบัญชีพนักงาน</span>
-                </button>
-              </li>
               <li className={`menu-item ${view === 'integrations' ? 'active' : ''}`}>
                 <button onClick={() => { setInventoryFilterName(''); setView('integrations'); }}>
                   <Link2 size={20} className="icon" />
@@ -457,10 +460,10 @@ export default function App() {
         <header className="main-header">
           <div className="header-title">
             <h1>
-              {view === 'dashboard' && (role === 'manager' ? 'แดชบอร์ดสรุปผลรวม' : 'ตารางงานและการแจ้งเตือน SOP')}
+              {view === 'dashboard' && ((role === 'admin' || role === 'manager') ? 'แดชบอร์ดสรุปผลรวม' : 'ตารางงานและการแจ้งเตือน SOP')}
               {view === 'sops' && 'คลังคู่มือและขั้นตอนการปฏิบัติงาน'}
               {view === 'scheduler' && 'ระบบตั้งเวลาอัตโนมัติ (Cron Scheduler)'}
-              {view === 'inventory' && (role === 'manager' ? 'ระบบคลังวัตถุดิบและการกระทบยอดขาย POS' : 'บันทึกจัดซื้อนำเข้าวัตถุดิบ')}
+              {view === 'inventory' && ((role === 'admin' || role === 'manager') ? 'ระบบคลังวัตถุดิบและการกระทบยอดขาย POS' : 'บันทึกจัดซื้อนำเข้าวัตถุดิบ')}
               {view === 'staff_management' && 'การจัดการบัญชีพนักงาน (Staff Accounts)'}
               {view === 'integrations' && 'การเชื่อมต่อระบบภายนอก (API Connectors)'}
               {view === 'logs' && 'ประวัติและข้อมูลบันทึกทางเทคนิค'}
@@ -537,7 +540,7 @@ export default function App() {
               />
             )}
 
-            {view === 'staff_management' && role === 'manager' && (
+            {view === 'staff_management' && (role === 'admin' || role === 'manager') && (
               <StaffManagement 
                 currentUser={currentUser} 
               />

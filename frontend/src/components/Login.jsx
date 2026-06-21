@@ -163,7 +163,7 @@ export default function Login({ onLoginSuccess }) {
             <input
               type="text"
               className="form-control"
-              placeholder="กรอกชื่อผู้ใช้ เช่น manager, staff"
+              placeholder="กรอกชื่อผู้ใช้ เช่น admin, manager, staff"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               disabled={loading}

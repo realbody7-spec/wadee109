@@ -89,8 +89,8 @@ export default function StaffManagement({ currentUser }) {
       return;
     }
 
-    if (targetUsername === 'manager') {
-      alert('ไม่สามารถลบบัญชีผู้จัดการหลัก (manager) ของระบบได้');
+    if (targetUsername === 'admin') {
+      alert('ไม่สามารถลบบัญชีผู้ดูแลระบบหลัก (admin) ของระบบได้');
       return;
     }
 
@@ -237,7 +237,12 @@ export default function StaffManagement({ currentUser }) {
               disabled={isSubmitting}
             >
               <option value="staff">👥 พนักงาน (ดูและบันทึกคลังได้อย่างเดียว)</option>
-              <option value="manager">🔑 ผู้จัดการ (ควบคุมระบบได้ทั้งหมด)</option>
+              {currentUser.role === 'admin' && (
+                <>
+                  <option value="manager">🔑 ผู้จัดการ (ควบคุมระบบได้เกือบทั้งหมด ยกเว้นการเชื่อมต่อและหน้าล็อก)</option>
+                  <option value="admin">🛡️ ผู้ดูแลระบบ (ควบคุมระบบได้ทั้งหมดทุกหน้า)</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -276,7 +281,7 @@ export default function StaffManagement({ currentUser }) {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '1rem 1.25rem',
-                  borderLeft: `4px solid ${u.role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)'}`
+                  borderLeft: `4px solid ${u.role === 'admin' ? 'var(--accent-danger)' : u.role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)'}`
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -284,13 +289,13 @@ export default function StaffManagement({ currentUser }) {
                     width: '40px',
                     height: '40px',
                     borderRadius: '50%',
-                    backgroundColor: u.role === 'manager' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(14, 165, 233, 0.08)',
+                    backgroundColor: u.role === 'admin' ? 'rgba(239, 68, 68, 0.08)' : u.role === 'manager' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(14, 165, 233, 0.08)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: u.role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)'
+                    color: u.role === 'admin' ? 'var(--accent-danger)' : u.role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)'
                   }}>
-                    {u.role === 'manager' ? <Shield size={18} /> : <Users size={18} />}
+                    {u.role === 'admin' || u.role === 'manager' ? <Shield size={18} /> : <Users size={18} />}
                   </div>
                   <div>
                     <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{u.name}</div>
@@ -317,8 +322,8 @@ export default function StaffManagement({ currentUser }) {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span className={`badge ${u.role === 'manager' ? 'badge-success' : 'badge-simulated'}`}>
-                    {u.role === 'manager' ? 'ผู้จัดการ (Manager)' : 'พนักงาน (Staff)'}
+                  <span className={`badge ${u.role === 'admin' ? 'badge-danger' : u.role === 'manager' ? 'badge-success' : 'badge-simulated'}`}>
+                    {u.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : u.role === 'manager' ? 'ผู้จัดการ (Manager)' : 'พนักงาน (Staff)'}
                   </span>
                   
                   {editingUserId !== u.id && (
@@ -336,7 +341,7 @@ export default function StaffManagement({ currentUser }) {
                     </button>
                   )}
                   
-                  {u.username !== 'manager' && u.username !== currentUser.username && (
+                  {u.username !== 'admin' && u.username !== currentUser.username && (
                     <button
                       type="button"
                       className="btn btn-danger btn-icon-only"
@@ -365,7 +370,7 @@ export default function StaffManagement({ currentUser }) {
           color: 'var(--text-secondary)'
         }}>
           <AlertTriangle size={16} style={{ color: 'var(--accent-amber)', flexShrink: 0 }} />
-          <span>บัญชีผู้จัดการหลัก (username: <strong>manager</strong>) และบัญชีของตัวคุณเองที่กำลังล็อกอิน จะได้รับการคุ้มครองเพื่อความปลอดภัย ไม่สามารถลบออกจากระบบได้</span>
+          <span>บัญชีผู้ดูแลระบบหลัก (username: <strong>admin</strong>) และบัญชีของตัวคุณเองที่กำลังล็อกอิน จะได้รับการคุ้มครองเพื่อความปลอดภัย ไม่สามารถลบออกจากระบบได้</span>
         </div>
       </div>
     </div>

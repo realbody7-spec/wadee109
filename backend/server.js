@@ -345,8 +345,8 @@ app.delete('/api/users/:id', (req, res) => {
     return res.status(404).json({ error: 'ไม่พบผู้ใช้ที่ต้องการลบ' });
   }
 
-  if (userToDelete.username === 'manager') {
-    return res.status(400).json({ error: 'ไม่สามารถลบบัญชีผู้จัดการหลัก (manager) ได้' });
+  if (userToDelete.username === 'admin') {
+    return res.status(400).json({ error: 'ไม่สามารถลบบัญชีผู้ดูแลระบบหลัก (admin) ได้' });
   }
 
   const filtered = users.filter(u => u.id !== req.params.id);
