@@ -793,5 +793,43 @@ app.get('*', (req, res) => {
 // Start server and cron scheduler
 app.listen(PORT, () => {
   console.log(`[Server] Backend running on http://localhost:${PORT}`);
+  
+  // Run user roles migration / initialization
+  try {
+    const users = readData(USERS_FILE, []);
+    let modified = false;
+
+    // 1. If 'manager' exists, rename/upgrade to 'admin'
+    const managerIndex = users.findIndex(u => u.username === 'manager');
+    if (managerIndex !== -1) {
+      console.log(`[Migration] Migrating old 'manager' user to 'admin'...`);
+      users[managerIndex].username = 'admin';
+      users[managerIndex].name = 'ผู้ดูแลระบบ';
+      users[managerIndex].role = 'admin';
+      modified = true;
+    }
+
+    // 2. Ensure 'admin' exists
+    const adminExists = users.some(u => u.username === 'admin');
+    if (!adminExists) {
+      console.log(`[Migration] Admin user not found. Creating default 'admin' user...`);
+      users.push({
+        id: 'user-1',
+        username: 'admin',
+        password: '1234',
+        name: 'ผู้ดูแลระบบ',
+        role: 'admin'
+      });
+      modified = true;
+    }
+
+    if (modified) {
+      writeData(USERS_FILE, users);
+      console.log(`[Migration] Users migration completed successfully.`);
+    }
+  } catch (err) {
+    console.error(`[Migration] Error running users migration:`, err);
+  }
+
   startScheduler();
 });
