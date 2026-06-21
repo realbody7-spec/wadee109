@@ -326,7 +326,7 @@ export default function StaffManagement({ currentUser }) {
                     {u.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : u.role === 'manager' ? 'ผู้จัดการ (Manager)' : 'พนักงาน (Staff)'}
                   </span>
                   
-                  {editingUserId !== u.id && (
+                  {editingUserId !== u.id && (currentUser.role === 'admin' || u.username === currentUser.username || u.role === 'staff') && (
                     <button
                       type="button"
                       className="btn btn-secondary btn-icon-only"
@@ -341,7 +341,7 @@ export default function StaffManagement({ currentUser }) {
                     </button>
                   )}
                   
-                  {u.username !== 'admin' && u.username !== currentUser.username && (
+                  {u.username !== 'admin' && u.username !== currentUser.username && (currentUser.role === 'admin' || u.role === 'staff') && (
                     <button
                       type="button"
                       className="btn btn-danger btn-icon-only"
