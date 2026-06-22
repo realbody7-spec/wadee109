@@ -23,3 +23,7 @@ backend/public/uploads/*
 !backend/public/uploads/.gitkeep
 backend/public/assets/
 backend/public/index.html
+
+# Ignore local APK build and JDK download
+sop_notifier_app.apk
+jdk-download/
