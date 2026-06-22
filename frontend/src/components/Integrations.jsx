@@ -547,9 +547,10 @@ function doPost(e) {
       else if (colName === 'ตรวจสอบ') checkColIndex = i + 1;
     }
     
-    // สร้างแถวข้อมูลใหม่และเติมค่าเริ่มต้น
+    // สร้างแถวข้อมูลใหม่และเติมค่าเริ่มต้น (จำกัดเฉพาะความยาวข้อมูลหลัก ไม่ล้ำเส้นไปถึงตารางสรุปสีเขียว)
+    var dataColsLength = (checkColIndex !== -1) ? checkColIndex : (colIndex !== -1 ? colIndex + 3 : lastCol);
     var newRow = [];
-    for (var i = 0; i < lastCol; i++) {
+    for (var i = 0; i < dataColsLength; i++) {
       newRow.push('');
     }
     
