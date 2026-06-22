@@ -11,7 +11,9 @@ import {
   WifiOff,
   ClipboardList,
   Users,
-  LogOut
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
 import Dashboard from './components/Dashboard.jsx';
 import SopManager from './components/SopManager.jsx';
@@ -25,6 +27,7 @@ import StaffManagement from './components/StaffManagement.jsx';
 export default function App() {
   const [view, setView] = useState('dashboard');
   const [theme, setTheme] = useState('light');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('currentUser');
     if (saved) {
@@ -353,11 +356,26 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {/* Mobile Top Navbar */}
+      <div className="mobile-navbar">
+        <button className="menu-toggle-btn-mobile" onClick={() => setIsMobileMenuOpen(true)}>
+          <Menu size={24} />
+        </button>
+        <div className="mobile-logo">
+          <CalendarClock size={22} className="logo-icon" />
+          <span className="logo-text">SOP NOTIFIER</span>
+        </div>
+        <div style={{ width: 40 }}></div>
+      </div>
+
       {/* Sidebar Navigation */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="logo-container">
           <CalendarClock size={28} className="logo-icon" />
           <span className="logo-text">SOP NOTIFIER</span>
+          <button className="mobile-close-btn" onClick={() => setIsMobileMenuOpen(false)}>
+            <X size={20} />
+          </button>
         </div>
 
         {/* User Profile Card */}
@@ -375,7 +393,7 @@ export default function App() {
         <ul className="sidebar-menu">
           {(role === 'admin' || role === 'manager') && (
             <li className={`menu-item ${view === 'dashboard' ? 'active' : ''}`}>
-              <button onClick={() => { setInventoryFilterName(''); setView('dashboard'); }}>
+              <button onClick={() => { setInventoryFilterName(''); setView('dashboard'); setIsMobileMenuOpen(false); }}>
                 <LayoutDashboard size={20} className="icon" />
                 <span>แดชบอร์ดหลัก</span>
               </button>
@@ -385,13 +403,13 @@ export default function App() {
           {(role === 'admin' || role === 'manager') && (
             <>
               <li className={`menu-item ${view === 'sops' ? 'active' : ''}`}>
-                <button onClick={() => { setInventoryFilterName(''); setView('sops'); }}>
+                <button onClick={() => { setInventoryFilterName(''); setView('sops'); setIsMobileMenuOpen(false); }}>
                   <BookOpen size={20} className="icon" />
                   <span>คลังคู่มือ SOP</span>
                 </button>
               </li>
               <li className={`menu-item ${view === 'scheduler' ? 'active' : ''}`}>
-                <button onClick={() => { setInventoryFilterName(''); setView('scheduler'); }}>
+                <button onClick={() => { setInventoryFilterName(''); setView('scheduler'); setIsMobileMenuOpen(false); }}>
                   <CalendarClock size={20} className="icon" />
                   <span>ตั้งเวลาแจ้งเตือน</span>
                 </button>
@@ -400,7 +418,7 @@ export default function App() {
           )}
 
           <li className={`menu-item ${view === 'inventory' ? 'active' : ''}`}>
-            <button onClick={() => { setInventoryFilterName(''); setView('inventory'); }}>
+            <button onClick={() => { setInventoryFilterName(''); setView('inventory'); setIsMobileMenuOpen(false); }}>
               <ClipboardList size={20} className="icon" />
               <span>{(role === 'admin' || role === 'manager') ? 'คลังวัตถุดิบและยอดขาย POS' : 'บันทึกนำเข้าจัดซื้อวัตถุดิบ'}</span>
             </button>
@@ -408,7 +426,7 @@ export default function App() {
 
           {(role === 'admin' || role === 'manager') && (
             <li className={`menu-item ${view === 'staff_management' ? 'active' : ''}`}>
-              <button onClick={() => { setInventoryFilterName(''); setView('staff_management'); }}>
+              <button onClick={() => { setInventoryFilterName(''); setView('staff_management'); setIsMobileMenuOpen(false); }}>
                 <Users size={20} className="icon" />
                 <span>จัดการบัญชีพนักงาน</span>
               </button>
@@ -418,13 +436,13 @@ export default function App() {
           {role === 'admin' && (
             <>
               <li className={`menu-item ${view === 'integrations' ? 'active' : ''}`}>
-                <button onClick={() => { setInventoryFilterName(''); setView('integrations'); }}>
+                <button onClick={() => { setInventoryFilterName(''); setView('integrations'); setIsMobileMenuOpen(false); }}>
                   <Link2 size={20} className="icon" />
                   <span>การเชื่อมต่อระบบ</span>
                 </button>
               </li>
               <li className={`menu-item ${view === 'logs' ? 'active' : ''}`}>
-                <button onClick={() => { setInventoryFilterName(''); setView('logs'); }}>
+                <button onClick={() => { setInventoryFilterName(''); setView('logs'); setIsMobileMenuOpen(false); }}>
                   <TerminalIcon size={20} className="icon" />
                   <span>คอนโซลล็อกยิงแชท</span>
                 </button>
@@ -434,7 +452,7 @@ export default function App() {
         </ul>
 
         {/* Theme toggle btn */}
-        <button className="theme-toggle-btn" style={{ marginBottom: '0.5rem' }} onClick={toggleTheme}>
+        <button className="theme-toggle-btn" style={{ marginBottom: '0.5rem' }} onClick={() => { toggleTheme(); setIsMobileMenuOpen(false); }}>
           {theme === 'dark' ? (
             <>
               <Sun size={18} />
@@ -449,11 +467,16 @@ export default function App() {
         </button>
 
         {/* Logout btn */}
-        <button className="theme-toggle-btn" style={{ borderColor: 'rgba(239, 68, 68, 0.2)', color: 'var(--accent-danger)' }} onClick={handleLogout}>
+        <button className="theme-toggle-btn" style={{ borderColor: 'rgba(239, 68, 68, 0.2)', color: 'var(--accent-danger)' }} onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}>
           <LogOut size={18} />
           <span>ออกจากระบบ (Logout)</span>
         </button>
       </aside>
+
+      {/* Backdrop overlay for mobile menu */}
+      {isMobileMenuOpen && (
+        <div className="sidebar-overlay" onClick={() => setIsMobileMenuOpen(false)}></div>
+      )}
 
       {/* Main Content Pane */}
       <main className="main-content">
