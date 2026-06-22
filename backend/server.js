@@ -39,6 +39,24 @@ const INVENTORY_FILE = path.join(__dirname, 'data', 'inventory.json');
 const POS_SALES_FILE = path.join(__dirname, 'data', 'pos_sales.json');
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 
+// Google Drive Folder ID extractor
+function extractDriveFolderId(input) {
+  if (!input) return '';
+  const trimmed = input.trim();
+  if (trimmed.includes('drive.google.com')) {
+    // Match /folders/ID
+    const folderMatch = trimmed.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+    if (folderMatch && folderMatch[1]) {
+      return folderMatch[1];
+    }
+    // Match ?id=ID or &id=ID
+    const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9-_]+)/);
+    if (idMatch && idMatch[1]) {
+      return idMatch[1];
+    }
+  }
+  return trimmed;
+}
 
 // File Helper functions
 function readData(filePath, defaultVal = []) {
@@ -243,7 +261,7 @@ app.put('/api/settings', (req, res) => {
     lineUserId: req.body.lineUserId ?? currentSettings.lineUserId,
     lineChannelSecret: req.body.lineChannelSecret ?? currentSettings.lineChannelSecret,
     googleSheetWebhookUrl: req.body.googleSheetWebhookUrl ?? currentSettings.googleSheetWebhookUrl,
-    driveFolderId: req.body.driveFolderId ?? currentSettings.driveFolderId,
+    driveFolderId: req.body.driveFolderId !== undefined ? extractDriveFolderId(req.body.driveFolderId) : currentSettings.driveFolderId,
     messengerPageAccessToken: req.body.messengerPageAccessToken ?? currentSettings.messengerPageAccessToken,
     messengerRecipientId: req.body.messengerRecipientId ?? currentSettings.messengerRecipientId
   };
@@ -623,7 +641,7 @@ app.post('/api/settings/test-sheet', async (req, res) => {
   }
 
   const settings = readData(SETTINGS_FILE, {});
-  const folderIdToUse = driveFolderId ?? settings.driveFolderId;
+  const folderIdToUse = extractDriveFolderId(driveFolderId ?? settings.driveFolderId);
 
   try {
     const response = await axios.post(webhookUrl, {

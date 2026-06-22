@@ -378,6 +378,9 @@ export default function Integrations({ settings, onSaveSettings }) {
                   onChange={(e) => setDriveFolderId(e.target.value)}
                   placeholder="ปล่อยว่างได้เพื่อสร้างโฟลเดอร์อัตโนมัติ"
                 />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
+                  💡 สามารถป้อนเฉพาะไอดี หรือวางลิงก์ยาวของโฟลเดอร์ตรง ๆ ก็ได้ (ระบบจะดึงไอดีออกมาใช้งานให้อัตโนมัติ)
+                </span>
               </div>
             </div>
 
