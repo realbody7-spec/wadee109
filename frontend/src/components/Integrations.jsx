@@ -547,58 +547,134 @@ function doPost(e) {
       else if (colName === 'ตรวจสอบ') checkColIndex = i + 1;
     }
     
-    // สร้างแถวข้อมูลใหม่และเติมค่าเริ่มต้น (จำกัดเฉพาะความยาวข้อมูลหลัก ไม่ล้ำเส้นไปถึงตารางสรุปสีเขียว)
-    var dataColsLength = (checkColIndex !== -1) ? checkColIndex : (colIndex !== -1 ? colIndex + 3 : lastCol);
-    var newRow = [];
-    for (var i = 0; i < dataColsLength; i++) {
-      newRow.push('');
-    }
+    // 🔍 ตรวจสอบสิทธิ์และตัดสินใจว่าจะเขียนแถวเดิมหรือแถวใหม่
+    var lastRow = getLastDataRow(sheet);
+    var incomingDate = new Date(data.date || new Date());
+    var writeToSameRow = false;
     
-    var nextRow = getLastDataRow(sheet) + 1;
-    if (nextRow < 4) {
-      nextRow = 4;
-    }
-    
-    var maxRows = sheet.getMaxRows();
-    if (nextRow > maxRows) {
-      sheet.insertRowsAfter(maxRows, 1);
-    }
-    
-    newRow[0] = new Date(data.date || new Date());
-    newRow[1] = data.cost || 0;
-    newRow[2] = data.quantity || 0;
-    
-    // ใส่ราคาวัตถุดิบลงในคอลัมน์สินค้าที่ถูกต้อง
-    if (colIndex !== -1 && colIndex <= lastCol) {
-      newRow[colIndex - 1] = data.cost || 0;
-    }
-    
-    // ใส่ลิงก์รูปภาพในคอลัมน์สุดท้าย
-    for (var i = 3; i < columns.length; i++) {
-      if (columns[i] && columns[i].toString().trim() === 'รูปภาพบิล') {
-        newRow[i] = driveFileUrl;
-        break;
+    if (lastRow >= 4) {
+      var cellDateVal = sheet.getRange(lastRow, 1).getValue();
+      if (cellDateVal) {
+        var isSame = false;
+        try {
+          var date1 = new Date(cellDateVal);
+          var date2 = new Date(incomingDate);
+          isSame = date1.getFullYear() === date2.getFullYear() &&
+                   date1.getMonth() === date2.getMonth() &&
+                   date1.getDate() === date2.getDate();
+        } catch (e) {
+          isSame = false;
+        }
+        
+        if (isSame) {
+          // ตรวจสอบว่าช่องราคาสินค้านี้ในแถวนี้ว่างหรือไม่
+          if (colIndex !== -1 && colIndex <= lastCol) {
+            var targetVal = sheet.getRange(lastRow, colIndex).getValue();
+            if (targetVal === "" || targetVal === null || targetVal === undefined || targetVal === 0 || targetVal.toString().trim() === "") {
+              writeToSameRow = true;
+            }
+          }
+        }
       }
     }
     
-    // ใส่ค่าและสูตรสำหรับ ส่วนลด, ราคาสุทธิ, รับเงินแล้ว, ตรวจสอบ
-    if (discountColIndex !== -1) {
-      newRow[discountColIndex - 1] = data.discount || 0;
+    if (writeToSameRow) {
+      // 1. ใส่ราคาในช่องคอลัมน์สินค้าที่ถูกต้อง
+      sheet.getRange(lastRow, colIndex).setValue(data.cost || 0);
+      
+      // 2. บวกยอดรวมบิลเพิ่ม
+      var currentCost = parseFloat(sheet.getRange(lastRow, 2).getValue()) || 0;
+      sheet.getRange(lastRow, 2).setValue(currentCost + (data.cost || 0));
+      
+      // 3. บวกจำนวนสินค้าเพิ่ม
+      var currentQty = parseFloat(sheet.getRange(lastRow, 3).getValue()) || 0;
+      sheet.getRange(lastRow, 3).setValue(currentQty + (data.quantity || 0));
+      
+      // 4. บวกส่วนลดเพิ่ม (หากมี)
+      if (discountColIndex !== -1) {
+        var currentDiscount = parseFloat(sheet.getRange(lastRow, discountColIndex).getValue()) || 0;
+        sheet.getRange(lastRow, discountColIndex).setValue(currentDiscount + (data.discount || 0));
+      }
+      
+      // 5. บวกรับเงินแล้วเพิ่ม (หากมี)
+      if (receivedColIndex !== -1) {
+        var currentReceived = parseFloat(sheet.getRange(lastRow, receivedColIndex).getValue()) || 0;
+        var newReceivedItem = data.received !== undefined ? data.received : (data.cost || 0) - (data.discount || 0);
+        sheet.getRange(lastRow, receivedColIndex).setValue(currentReceived + newReceivedItem);
+      }
+      
+      // 6. บันทึกรูปภาพ (หากมี)
+      if (driveFileUrl !== '-') {
+        var imageColIndex = -1;
+        for (var i = 3; i < columns.length; i++) {
+          if (columns[i] && columns[i].toString().trim() === 'รูปภาพบิล') {
+            imageColIndex = i + 1;
+            break;
+          }
+        }
+        if (imageColIndex !== -1) {
+          var currentImg = sheet.getRange(lastRow, imageColIndex).getValue();
+          if (currentImg === "" || currentImg === null || currentImg === undefined || currentImg === "-" || currentImg === 0 || currentImg.toString().trim() === "") {
+            sheet.getRange(lastRow, imageColIndex).setValue(driveFileUrl);
+          } else {
+            sheet.getRange(lastRow, imageColIndex).setValue(currentImg + ", " + driveFileUrl);
+          }
+        }
+      }
+    } else {
+      // สร้างแถวข้อมูลใหม่และเติมค่าเริ่มต้น (จำกัดเฉพาะความยาวข้อมูลหลัก ไม่ล้ำเส้นไปถึงตารางสรุปสีเขียว)
+      var dataColsLength = (checkColIndex !== -1) ? checkColIndex : (colIndex !== -1 ? colIndex + 3 : lastCol);
+      var newRow = [];
+      for (var i = 0; i < dataColsLength; i++) {
+        newRow.push('');
+      }
+      
+      var nextRow = getLastDataRow(sheet) + 1;
+      if (nextRow < 4) {
+        nextRow = 4;
+      }
+      
+      var maxRows = sheet.getMaxRows();
+      if (nextRow > maxRows) {
+        sheet.insertRowsAfter(maxRows, 1);
+      }
+      
+      newRow[0] = new Date(data.date || new Date());
+      newRow[1] = data.cost || 0;
+      newRow[2] = data.quantity || 0;
+      
+      // ใส่ราคาวัตถุดิบลงในคอลัมน์สินค้าที่ถูกต้อง
+      if (colIndex !== -1 && colIndex <= lastCol) {
+        newRow[colIndex - 1] = data.cost || 0;
+      }
+      
+      // ใส่ลิงก์รูปภาพในคอลัมน์สุดท้าย
+      for (var i = 3; i < columns.length; i++) {
+        if (columns[i] && columns[i].toString().trim() === 'รูปภาพบิล') {
+          newRow[i] = driveFileUrl;
+          break;
+        }
+      }
+      
+      // ใส่ค่าและสูตรสำหรับ ส่วนลด, ราคาสุทธิ, รับเงินแล้ว, ตรวจสอบ
+      if (discountColIndex !== -1) {
+        newRow[discountColIndex - 1] = data.discount || 0;
+      }
+      if (netPriceColIndex !== -1) {
+        var discountLetter = getColumnLetter(discountColIndex);
+        newRow[netPriceColIndex - 1] = "=B" + nextRow + "-" + discountLetter + nextRow;
+      }
+      if (receivedColIndex !== -1) {
+        newRow[receivedColIndex - 1] = data.received !== undefined ? data.received : (data.cost || 0) - (data.discount || 0);
+      }
+      if (checkColIndex !== -1) {
+        var netLetter = getColumnLetter(netPriceColIndex);
+        var receivedLetter = getColumnLetter(receivedColIndex);
+        newRow[checkColIndex - 1] = "=" + receivedLetter + nextRow + "=" + netLetter + nextRow;
+      }
+      
+      sheet.getRange(nextRow, 1, 1, newRow.length).setValues([newRow]);
     }
-    if (netPriceColIndex !== -1) {
-      var discountLetter = getColumnLetter(discountColIndex);
-      newRow[netPriceColIndex - 1] = "=B" + nextRow + "-" + discountLetter + nextRow;
-    }
-    if (receivedColIndex !== -1) {
-      newRow[receivedColIndex - 1] = data.received !== undefined ? data.received : (data.cost || 0) - (data.discount || 0);
-    }
-    if (checkColIndex !== -1) {
-      var netLetter = getColumnLetter(netPriceColIndex);
-      var receivedLetter = getColumnLetter(receivedColIndex);
-      newRow[checkColIndex - 1] = "=" + receivedLetter + nextRow + "=" + netLetter + nextRow;
-    }
-    
-    sheet.getRange(nextRow, 1, 1, newRow.length).setValues([newRow]);
     
     return ContentService.createTextOutput(JSON.stringify({
       success: true, 
