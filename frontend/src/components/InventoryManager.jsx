@@ -4,6 +4,7 @@ import {
   Upload, 
   Plus, 
   Trash2, 
+  Pencil,
   ClipboardList, 
   TrendingUp, 
   AlertTriangle, 
@@ -57,6 +58,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
   const [portionUnit, setPortionUnit] = useState('kg');
   const [associatedPosItem, setAssociatedPosItem] = useState('');
   const [image, setImage] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
 
   // Camera states
   const [cameraActive, setCameraActive] = useState(false);
@@ -214,9 +216,16 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
         associatedPosItem: associatedPosItem || name
       };
 
-      const res = await fetch('/api/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const isEdit = !!editingItem;
+      const url = isEdit ? `/api/inventory/${editingItem.id}` : '/api/inventory';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method: method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-role': role
+        },
         body: JSON.stringify(payload)
       });
 
@@ -228,16 +237,19 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
         setBillNumber('');
         setImage(null);
         setPortionSize('');
+        setPortionUnit('kg');
         setAssociatedPosItem('');
+        setEditingItem(null);
         
         // Refresh Lists
         await Promise.all([
           fetchInventory(),
           fetchReconciliation()
         ]);
-        alert('บันทึกข้อมูลนำเข้าวัตถุดิบสำเร็จ!');
+        alert(isEdit ? 'แก้ไขข้อมูลวัตถุดิบสำเร็จ!' : 'บันทึกข้อมูลนำเข้าวัตถุดิบสำเร็จ!');
       } else {
-        alert('บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        const errorData = await res.json().catch(() => ({}));
+        alert(errorData.error || 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
       }
     } catch (err) {
       console.error('Error saving inventory:', err);
@@ -247,15 +259,52 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
     }
   };
 
+  const handleEditInventory = (item) => {
+    setEditingItem(item);
+    setName(item.name || '');
+    setCategory(item.category || 'เครื่องครัว/ของแห้ง');
+    setQuantity(item.quantity !== undefined ? item.quantity.toString() : '');
+    setUnit(item.unit || '');
+    setCost(item.cost !== undefined ? item.cost.toString() : '');
+    setBillNumber(item.billNumber || '');
+    setPortionSize(item.portionSize !== undefined ? item.portionSize.toString() : '');
+    setPortionUnit(item.portionUnit || '');
+    setAssociatedPosItem(item.associatedPosItem || '');
+    setImage(item.image || null);
+    
+    // Switch to intake tab
+    setSubTab('intake');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingItem(null);
+    setName('');
+    setCategory('เครื่องครัว/ของแห้ง');
+    setQuantity('');
+    setUnit('kg');
+    setCost('');
+    setBillNumber('');
+    setPortionSize('');
+    setPortionUnit('kg');
+    setAssociatedPosItem('');
+    setImage(null);
+  };
+
   const handleDeleteInventory = async (id) => {
     if (!confirm('ยืนยันที่จะลบรายการรับเข้าวัตถุดิบนี้หรือไม่?')) return;
     try {
-      const res = await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/inventory/${id}`, { 
+        method: 'DELETE',
+        headers: { 'x-user-role': role }
+      });
       if (res.ok) {
         await Promise.all([
           fetchInventory(),
           fetchReconciliation()
         ]);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        alert(errorData.error || 'ลบข้อมูลไม่สำเร็จ');
       }
     } catch (err) {
       console.error('Error deleting inventory:', err);
@@ -443,7 +492,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
           {/* Left Column: Form */}
           <form className="card card-accent-amber" onSubmit={handleSaveInventory} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div className="card-title-row" style={{ marginBottom: '0.5rem' }}>
-              <h2>บันทึกรับวัตถุดิบขาเข้า</h2>
+              <h2>{editingItem ? 'แก้ไขข้อมูลวัตถุดิบขาเข้า' : 'บันทึกรับวัตถุดิบขาเข้า'}</h2>
               <Package size={20} className="logo-icon" />
             </div>
 
@@ -621,9 +670,30 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
               )}
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.85rem' }} disabled={loading}>
-              {loading ? 'กำลังบันทึกข้อมูล...' : 'บันทึกรับวัตถุดิบ'}
-            </button>
+            {editingItem ? (
+              <div style={{ display: 'flex', gap: '1rem', width: '100%' }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  style={{ flexGrow: 2, padding: '0.85rem' }} 
+                  disabled={loading}
+                >
+                  {loading ? 'กำลังบันทึกการแก้ไข...' : 'บันทึกการแก้ไข'}
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ flexGrow: 1, padding: '0.85rem' }} 
+                  onClick={handleCancelEdit}
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            ) : (
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.85rem' }} disabled={loading}>
+                {loading ? 'กำลังบันทึกข้อมูล...' : 'บันทึกรับวัตถุดิบ'}
+              </button>
+            )}
           </form>
 
           {/* Right Column: Inventory Logs */}
@@ -713,13 +783,24 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
                       </div>
 
                       {(role === 'admin' || role === 'manager') && (
-                        <button 
-                          className="btn btn-danger btn-icon-only" 
-                          onClick={() => handleDeleteInventory(item.id)}
-                          style={{ flexShrink: 0 }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                          <button 
+                            type="button"
+                            className="btn btn-secondary btn-icon-only" 
+                            onClick={() => handleEditInventory(item)}
+                            title="แก้ไขรายการ"
+                          >
+                            <Pencil size={16} style={{ color: 'var(--accent-blue)' }} />
+                          </button>
+                          <button 
+                            type="button"
+                            className="btn btn-danger btn-icon-only" 
+                            onClick={() => handleDeleteInventory(item.id)}
+                            title="ลบรายการ"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       )}
                     </div>
                   );

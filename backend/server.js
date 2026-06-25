@@ -512,7 +512,90 @@ app.post('/api/inventory', (req, res) => {
   res.status(201).json(newItem);
 });
 
+app.put('/api/inventory/:id', (req, res) => {
+  const userRole = req.headers['x-user-role'];
+  if (userRole !== 'admin' && userRole !== 'manager') {
+    return res.status(403).json({ error: 'สิทธิ์การใช้งานไม่ถูกต้อง เฉพาะแอดมินหรือผู้จัดการเท่านั้น' });
+  }
+
+  const items = readData(INVENTORY_FILE, []);
+  const itemIndex = items.findIndex(item => item.id === req.params.id);
+  
+  if (itemIndex === -1) {
+    return res.status(404).json({ error: 'ไม่พบข้อมูลวัตถุดิบนี้ในระบบ' });
+  }
+
+  let imagePath = items[itemIndex].image;
+  if (req.body.image && req.body.image.startsWith('data:image/')) {
+    try {
+      const matches = req.body.image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const ext = matches[1].split('/')[1] || 'jpeg';
+        const dataBuffer = Buffer.from(matches[2], 'base64');
+        
+        const uploadDir = path.join(__dirname, 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        
+        const filename = `bill-${Date.now()}.${ext}`;
+        const filepath = path.join(uploadDir, filename);
+        fs.writeFileSync(filepath, dataBuffer);
+        
+        // Delete old local image if it existed
+        if (items[itemIndex].image && items[itemIndex].image.startsWith('/uploads/')) {
+          const oldPath = path.join(__dirname, 'public', 'uploads', path.basename(items[itemIndex].image));
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+          }
+        }
+        
+        imagePath = `/uploads/${filename}`;
+      }
+    } catch (err) {
+      console.error('Error saving image file:', err);
+    }
+  } else if (req.body.image === null || req.body.image === '') {
+    // Delete old local image if it was cleared
+    if (items[itemIndex].image && items[itemIndex].image.startsWith('/uploads/')) {
+      try {
+        const oldPath = path.join(__dirname, 'public', 'uploads', path.basename(items[itemIndex].image));
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      } catch (e) {}
+    }
+    imagePath = null;
+  } else if (req.body.image) {
+    imagePath = req.body.image;
+  }
+
+  const updatedItem = {
+    ...items[itemIndex],
+    date: req.body.date || items[itemIndex].date,
+    name: req.body.name || items[itemIndex].name,
+    category: req.body.category || items[itemIndex].category,
+    quantity: parseFloat(req.body.quantity) || 0,
+    unit: req.body.unit || items[itemIndex].unit,
+    cost: parseFloat(req.body.cost) || 0,
+    billNumber: req.body.billNumber || '',
+    image: imagePath,
+    portionSize: parseFloat(req.body.portionSize) || items[itemIndex].portionSize || 1,
+    portionUnit: req.body.portionUnit || items[itemIndex].portionUnit || 'units',
+    associatedPosItem: req.body.associatedPosItem || ''
+  };
+
+  items[itemIndex] = updatedItem;
+  writeData(INVENTORY_FILE, items);
+  res.json(updatedItem);
+});
+
 app.delete('/api/inventory/:id', (req, res) => {
+  const userRole = req.headers['x-user-role'];
+  if (userRole !== 'admin' && userRole !== 'manager') {
+    return res.status(403).json({ error: 'สิทธิ์การใช้งานไม่ถูกต้อง เฉพาะแอดมินหรือผู้จัดการเท่านั้น' });
+  }
+
   const items = readData(INVENTORY_FILE, []);
   const itemToDelete = items.find(item => item.id === req.params.id);
   
