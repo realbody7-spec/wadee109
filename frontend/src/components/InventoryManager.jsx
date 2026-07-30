@@ -783,7 +783,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
                           <span className={`badge ${cat.badgeClass}`}>{cat.label}</span>
                         </div>
                         <span className="item-subtitle">
-                          จำนวน: <strong>{item.quantity} {item.unit}</strong> {item.pieces ? <span>({item.pieces} ชิ้น)</span> : ''} | ราคารับเข้า: <strong>{item.cost.toLocaleString()} บาท</strong>
+                          จำนวน: <strong>{item.quantity || 0} {item.unit || ''}</strong> {item.pieces ? <span>({item.pieces} ชิ้น)</span> : ''} | ราคารับเข้า: <strong>{(item.cost || 0).toLocaleString()} บาท</strong>
                         </span>
                         <span className="item-subtitle" style={{ color: 'var(--accent-green)' }}>
                           คำนวณจำนวนเสิร์ฟ: <strong>{potential} เสิร์ฟ</strong> (สูตรใช้ {item.portionSize} {item.portionUnit}/เสิร์ฟ)

@@ -301,8 +301,8 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
             {topCat && (
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>หมวดหมู่ที่จ่ายสูงสุด</span>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--accent-green)', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${categoriesConfig[topCat]?.label || topCat} (${periodCatCosts[topCat].toLocaleString()} ฿)`}>
-                  {categoriesConfig[topCat]?.label || topCat} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>({Math.round((periodCatCosts[topCat] / (periodTotal || 1)) * 100)}%)</span>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--accent-green)', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${categoriesConfig[topCat]?.label || topCat} (${(periodCatCosts[topCat] || 0).toLocaleString()} ฿)`}>
+                  {categoriesConfig[topCat]?.label || topCat} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-secondary)' }}>({Math.round(((periodCatCosts[topCat] || 0) / (periodTotal || 1)) * 100)}%)</span>
                 </h3>
               </div>
             )}
@@ -448,7 +448,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: Object.values(categoriesConfig).find(c => c.label === tooltip.category)?.color || '#9ca3af' }} />
                 <span>หมวดหมู่: <strong>{tooltip.category}</strong></span>
               </div>
-              <div>ยอดรับเข้า: <strong style={{ color: 'var(--accent-amber)', fontSize: '0.85rem' }}>{tooltip.cost.toLocaleString()} บาท</strong></div>
+              <div>ยอดรับเข้า: <strong style={{ color: 'var(--accent-amber)', fontSize: '0.85rem' }}>{(tooltip.cost || 0).toLocaleString()} บาท</strong></div>
             </div>
           )}
 
@@ -461,7 +461,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
                   <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <span style={{ width: '10px', height: '10px', borderRadius: '3px', backgroundColor: config.color }} />
                     <span style={{ color: 'var(--text-secondary)' }}>{config.label}</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>({periodCatCosts[cat].toLocaleString()} ฿)</strong>
+                    <strong style={{ color: 'var(--text-primary)' }}>({(periodCatCosts[cat] || 0).toLocaleString()} ฿)</strong>
                   </div>
                 );
               })}
@@ -510,7 +510,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
                   <div className="item-info" style={{ flexGrow: 1 }}>
                     <span className="item-title">{item.name}</span>
                     <span className="item-subtitle">
-                      จำนวน: <strong>{item.quantity} {item.unit}</strong> {item.pieces ? <span>({item.pieces} ชิ้น)</span> : ''} | ยอดเงิน: <strong>{item.cost.toLocaleString()} บาท</strong>
+                      จำนวน: <strong>{item.quantity || 0} {item.unit || ''}</strong> {item.pieces ? <span>({item.pieces} ชิ้น)</span> : ''} | ยอดเงิน: <strong>{(item.cost || 0).toLocaleString()} บาท</strong>
                     </span>
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
