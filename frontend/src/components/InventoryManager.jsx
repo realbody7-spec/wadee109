@@ -58,6 +58,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
   const [portionUnit, setPortionUnit] = useState('kg');
   const [associatedPosItem, setAssociatedPosItem] = useState('');
   const [image, setImage] = useState(null);
+  const [pieces, setPieces] = useState('');
   const [editingItem, setEditingItem] = useState(null);
 
   // Camera states
@@ -207,6 +208,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
         name,
         category,
         quantity: parseFloat(quantity),
+        pieces: parseFloat(pieces) || 0,
         unit,
         cost: parseFloat(cost),
         billNumber,
@@ -233,6 +235,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
         // Clear form
         setName('');
         setQuantity('');
+        setPieces('');
         setCost('');
         setBillNumber('');
         setImage(null);
@@ -264,6 +267,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
     setName(item.name || '');
     setCategory(item.category || 'เครื่องครัว/ของแห้ง');
     setQuantity(item.quantity !== undefined ? item.quantity.toString() : '');
+    setPieces(item.pieces !== undefined && item.pieces !== null ? item.pieces.toString() : '');
     setUnit(item.unit || '');
     setCost(item.cost !== undefined ? item.cost.toString() : '');
     setBillNumber(item.billNumber || '');
@@ -281,6 +285,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
     setName('');
     setCategory('เครื่องครัว/ของแห้ง');
     setQuantity('');
+    setPieces('');
     setUnit('kg');
     setCost('');
     setBillNumber('');
@@ -532,7 +537,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
                 <label>จำนวนที่รับเข้า <span style={{ color: 'var(--accent-danger)' }}>*</span></label>
                 <input 
@@ -543,6 +548,17 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
                   value={quantity} 
                   onChange={(e) => setQuantity(e.target.value)} 
                   required 
+                />
+              </div>
+              <div className="form-group">
+                <label>จำนวนชิ้น</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  className="form-control" 
+                  placeholder="เช่น 5" 
+                  value={pieces} 
+                  onChange={(e) => setPieces(e.target.value)} 
                 />
               </div>
               <div className="form-group">
@@ -767,7 +783,7 @@ export default function InventoryManager({ role = 'admin', filterName = '', setF
                           <span className={`badge ${cat.badgeClass}`}>{cat.label}</span>
                         </div>
                         <span className="item-subtitle">
-                          จำนวน: <strong>{item.quantity} {item.unit}</strong> | ราคารับเข้า: <strong>{item.cost.toLocaleString()} บาท</strong>
+                          จำนวน: <strong>{item.quantity} {item.unit}</strong> {item.pieces ? <span>({item.pieces} ชิ้น)</span> : ''} | ราคารับเข้า: <strong>{item.cost.toLocaleString()} บาท</strong>
                         </span>
                         <span className="item-subtitle" style={{ color: 'var(--accent-green)' }}>
                           คำนวณจำนวนเสิร์ฟ: <strong>{potential} เสิร์ฟ</strong> (สูตรใช้ {item.portionSize} {item.portionUnit}/เสิร์ฟ)

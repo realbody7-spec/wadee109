@@ -510,7 +510,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
                   <div className="item-info" style={{ flexGrow: 1 }}>
                     <span className="item-title">{item.name}</span>
                     <span className="item-subtitle">
-                      จำนวน: <strong>{item.quantity} {item.unit}</strong> | ยอดเงิน: <strong>{item.cost.toLocaleString()} บาท</strong>
+                      จำนวน: <strong>{item.quantity} {item.unit}</strong> {item.pieces ? <span>({item.pieces} ชิ้น)</span> : ''} | ยอดเงิน: <strong>{item.cost.toLocaleString()} บาท</strong>
                     </span>
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>

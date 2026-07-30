@@ -482,7 +482,7 @@ function doPost(e) {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     
     // ตรวจสอบว่าแผ่นงานมีหัวตารางคอลัมน์แล้วหรือยัง หากไม่มีให้สร้างอัตโนมัติ
-    if (sheet.getLastColumn() < 3) {
+    if (sheet.getLastColumn() < 4) {
       setupSheetTemplate(sheet);
     }
     
@@ -503,7 +503,7 @@ function doPost(e) {
     var itemNameLower = (data.name || '').trim().toLowerCase();
     
     // 1. ค้นหาแบบตรงตัวก่อน (Exact Match)
-    for (var i = 3; i < columns.length; i++) {
+    for (var i = 4; i < columns.length; i++) {
       if (columns[i] && columns[i].toString().trim().toLowerCase() === itemNameLower) {
         colIndex = i + 1;
         break;
@@ -512,7 +512,7 @@ function doPost(e) {
     
     // 2. ค้นหาแบบใกล้เคียงหากไม่เจอตรงตัว (Partial Match)
     if (colIndex === -1 && itemNameLower) {
-      for (var i = 3; i < columns.length; i++) {
+      for (var i = 4; i < columns.length; i++) {
         if (columns[i]) {
           var headerLower = columns[i].toString().trim().toLowerCase();
           if (itemNameLower.indexOf(headerLower) !== -1 || headerLower.indexOf(itemNameLower) !== -1) {
@@ -525,7 +525,7 @@ function doPost(e) {
     
     // 3. หากยังไม่พบอีก ให้หาช่อง 'อื่นๆ'
     if (colIndex === -1) {
-      for (var i = 3; i < columns.length; i++) {
+      for (var i = 4; i < columns.length; i++) {
         if (columns[i] && columns[i].toString().trim() === 'อื่นๆ') {
           colIndex = i + 1;
           break;
@@ -539,7 +539,7 @@ function doPost(e) {
     var receivedColIndex = -1;
     var checkColIndex = -1;
     
-    for (var i = 3; i < columns.length; i++) {
+    for (var i = 4; i < columns.length; i++) {
       var colName = columns[i].toString().trim();
       if (colName === 'ส่วนลด') discountColIndex = i + 1;
       else if (colName === 'ราคาสุทธิ') netPriceColIndex = i + 1;
@@ -590,6 +590,10 @@ function doPost(e) {
       var currentQty = parseFloat(sheet.getRange(lastRow, 3).getValue()) || 0;
       sheet.getRange(lastRow, 3).setValue(currentQty + (data.quantity || 0));
       
+      // 3.1 บวกจำนวนชิ้นเพิ่ม
+      var currentPieces = parseFloat(sheet.getRange(lastRow, 4).getValue()) || 0;
+      sheet.getRange(lastRow, 4).setValue(currentPieces + (data.pieces || 0));
+      
       // 4. บวกส่วนลดเพิ่ม (หากมี)
       if (discountColIndex !== -1) {
         var currentDiscount = parseFloat(sheet.getRange(lastRow, discountColIndex).getValue()) || 0;
@@ -606,7 +610,7 @@ function doPost(e) {
       // 6. บันทึกรูปภาพ (หากมี)
       if (driveFileUrl !== '-') {
         var imageColIndex = -1;
-        for (var i = 3; i < columns.length; i++) {
+        for (var i = 4; i < columns.length; i++) {
           if (columns[i] && columns[i].toString().trim() === 'รูปภาพบิล') {
             imageColIndex = i + 1;
             break;
@@ -642,6 +646,7 @@ function doPost(e) {
       newRow[0] = new Date(data.date || new Date());
       newRow[1] = data.cost || 0;
       newRow[2] = data.quantity || 0;
+      newRow[3] = data.pieces || 0;
       
       // ใส่ราคาวัตถุดิบลงในคอลัมน์สินค้าที่ถูกต้อง
       if (colIndex !== -1 && colIndex <= lastCol) {
@@ -649,7 +654,7 @@ function doPost(e) {
       }
       
       // ใส่ลิงก์รูปภาพในคอลัมน์สุดท้าย
-      for (var i = 3; i < columns.length; i++) {
+      for (var i = 4; i < columns.length; i++) {
         if (columns[i] && columns[i].toString().trim() === 'รูปภาพบิล') {
           newRow[i] = driveFileUrl;
           break;
@@ -811,8 +816,8 @@ function setupSheetTemplate(sheet) {
   sheet.getRange(2, 1, 1, totalCols).setValues([row2]);
   sheet.getRange(3, 1, 1, totalCols).setValues([row3]);
   
-  // ยุบรวมแนวตั้งสำหรับคอลัมน์ A-C (วันที่สั่งซื้อ, ยอดรวมบิล, จำนวน)
-  for (var c = 1; c <= 3; c++) {
+  // ยุบรวมแนวตั้งสำหรับคอลัมน์ A-D (วันที่สั่งซื้อ, ยอดรวมบิล, จำนวน, จำนวนชิ้น)
+  for (var c = 1; c <= 4; c++) {
     sheet.getRange(1, c, 3, 1).merge();
   }
   
@@ -822,8 +827,8 @@ function setupSheetTemplate(sheet) {
   }
   
   // ยุบรวมแถวที่ 1 แนวนอน
-  // 1. กลุ่มวัตถุดิบ (คอลัมน์ D ถึง cogsEndCol)
-  var cogsRange = sheet.getRange(1, 4, 1, cogsEndCol - 4 + 1);
+  // 1. กลุ่มวัตถุดิบ (คอลัมน์ E ถึง cogsEndCol)
+  var cogsRange = sheet.getRange(1, 5, 1, cogsEndCol - 5 + 1);
   cogsRange.merge();
   cogsRange.setBackground('#00ff00'); // สีเขียวสว่าง
   
