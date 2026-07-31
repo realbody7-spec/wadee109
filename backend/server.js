@@ -76,6 +76,10 @@ function readData(filePath, defaultVal = []) {
 function writeData(filePath, data) {
   try {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    if (filePath === INVENTORY_FILE) {
+      const backupPath = path.join(DATA_DIR, 'inventory_backup.json');
+      fs.writeFileSync(backupPath, JSON.stringify(data, null, 2));
+    }
     return true;
   } catch (error) {
     console.error(`Error writing ${filePath}:`, error);
@@ -83,7 +87,7 @@ function writeData(filePath, data) {
   }
 }
 
-// --- Status API ---
+// --- Status & Local DB Backup API ---
 app.get('/api/status', (req, res) => {
   res.json({
     status: "online",
@@ -93,8 +97,20 @@ app.get('/api/status', (req, res) => {
       schedules: "/api/schedules",
       settings: "/api/settings",
       logs: "/api/logs",
-      events: "/api/events"
+      inventory: "/api/inventory",
+      backup: "/api/inventory/backup"
     }
+  });
+});
+
+app.get('/api/inventory/backup', (req, res) => {
+  const backupPath = path.join(DATA_DIR, 'inventory_backup.json');
+  const backupData = readData(backupPath, readData(INVENTORY_FILE, []));
+  res.json({
+    success: true,
+    count: backupData.length,
+    backupFile: 'inventory_backup.json',
+    items: backupData
   });
 });
 

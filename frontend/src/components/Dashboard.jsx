@@ -308,116 +308,205 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
             )}
           </div>
 
-          {/* Chart Graphic Area */}
-          <div style={{ position: 'relative', width: '100%', height: '280px', padding: '1.5rem 0.5rem 2rem 3rem', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-card)', borderRadius: '12px' }}>
+          {/* Chart Graphic Area (Grouped Bar Chart) */}
+          <div style={{ 
+            position: 'relative', 
+            width: '100%', 
+            minHeight: '320px', 
+            padding: '2.5rem 0.5rem 2.5rem 3.5rem', 
+            background: 'rgba(255,255,255,0.01)', 
+            border: '1px solid var(--border-card)', 
+            borderRadius: '16px',
+            overflowX: 'auto'
+          }}>
             
             {/* Grid Line Marks */}
             {[0, 0.25, 0.5, 0.75, 1].map((ratio, index) => {
-              const val = Math.round(maxVal * ratio);
+              // Find max single category cost for scaling bar heights
+              let maxCatCost = 1000;
+              chartData.forEach(d => {
+                Object.values(d.breakdown).forEach(cost => {
+                  if (cost > maxCatCost) maxCatCost = cost;
+                });
+              });
+
+              const val = Math.round(maxCatCost * ratio);
               const bottomPercent = ratio * 100;
               return (
                 <React.Fragment key={index}>
-                  {/* Label */}
-                  <span style={{ position: 'absolute', left: '8px', bottom: `calc(${bottomPercent}% * 0.8 + 2rem)`, transform: 'translateY(50%)', fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'right', width: '38px' }}>
+                  {/* Y-Axis Label */}
+                  <span style={{ 
+                    position: 'absolute', 
+                    left: '8px', 
+                    bottom: `calc(${bottomPercent}% * 0.68 + 2.5rem)`, 
+                    transform: 'translateY(50%)', 
+                    fontSize: '0.7rem', 
+                    color: 'var(--text-muted)', 
+                    textAlign: 'right', 
+                    width: '42px',
+                    fontWeight: '600'
+                  }}>
                     {val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
                   </span>
                   {/* Grid line */}
-                  <div style={{ position: 'absolute', left: '3rem', right: '0.5rem', bottom: `calc(${bottomPercent}% * 0.8 + 2rem)`, height: '1px', borderBottom: '1px dashed var(--border-card)', opacity: 0.8 }} />
+                  <div style={{ 
+                    position: 'absolute', 
+                    left: '3.5rem', 
+                    right: '0.5rem', 
+                    bottom: `calc(${bottomPercent}% * 0.68 + 2.5rem)`, 
+                    height: '1px', 
+                    borderBottom: '1px dashed var(--border-card)', 
+                    opacity: 0.6 
+                  }} />
                 </React.Fragment>
               );
             })}
 
-            {/* Bars container */}
-            <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'flex-end', justifyContent: 'space-around', position: 'relative', zIndex: 2 }}>
-              {chartData.map((d, index) => {
-                const heightPercent = maxVal > 0 ? (d.total / maxVal) * 100 : 0;
-                
-                // Stack segments calculations
-                let accumPercent = 0;
-                const segments = Object.keys(d.breakdown)
-                  .filter(cat => d.breakdown[cat] > 0)
-                  .map(cat => {
-                    const cost = d.breakdown[cat];
-                    const segmentHeight = d.total > 0 ? (cost / d.total) * 100 : 0;
-                    const segmentStart = accumPercent;
-                    accumPercent += segmentHeight;
-                    return {
-                      cat,
-                      cost,
-                      height: segmentHeight,
-                      start: segmentStart
-                    };
+            {/* Grouped Bars Container */}
+            <div style={{ 
+              display: 'flex', 
+              width: '100%', 
+              height: '100%', 
+              alignItems: 'flex-end', 
+              justify: 'space-around', 
+              position: 'relative', 
+              zIndex: 2,
+              gap: '0.5rem'
+            }}>
+              {(() => {
+                let maxCatCost = 1000;
+                chartData.forEach(d => {
+                  Object.values(d.breakdown).forEach(cost => {
+                    if (cost > maxCatCost) maxCatCost = cost;
                   });
+                });
 
-                return (
-                  <div 
-                    key={index}
-                    style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center', 
-                      width: `${Math.max(12, Math.min(48, 80 / chartData.length))}%`, 
-                      height: '80%', 
-                      position: 'relative'
-                    }}
-                  >
-                    {/* The Stacked Bar Column */}
-                    {d.total > 0 ? (
-                      <div 
-                        style={{ 
-                          width: '100%', 
-                          height: `${heightPercent}%`, 
-                          borderRadius: '6px', 
-                          overflow: 'hidden', 
-                          background: 'rgba(255,255,255,0.05)',
-                          position: 'relative',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        {segments.map((seg, sIdx) => {
-                          const config = categoriesConfig[seg.cat] || categoriesConfig.others;
-                          return (
-                            <div 
-                              key={sIdx}
-                              style={{ 
-                                position: 'absolute',
-                                left: 0,
-                                width: '100%',
-                                bottom: `${seg.start}%`,
-                                height: `${seg.height}%`,
-                                backgroundColor: config.color,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className="chart-bar-segment"
-                              onMouseEnter={(e) => {
-                                const rect = e.target.getBoundingClientRect();
-                                setTooltip({
-                                  visible: true,
-                                  x: rect.left + window.scrollX + rect.width / 2,
-                                  y: rect.top + window.scrollY - 8,
-                                  date: chartType === 'daily' ? formatDailyLabel(d.label) : formatMonthlyLabel(d.label),
-                                  category: config.label,
-                                  cost: seg.cost
-                                });
-                              }}
-                              onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
-                            />
-                          );
-                        })}
+                return chartData.map((d, index) => {
+                  const activeCats = Object.keys(d.breakdown).filter(cat => (d.breakdown[cat] || 0) > 0);
+
+                  return (
+                    <div 
+                      key={index}
+                      style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        alignItems: 'center', 
+                        flex: 1,
+                        minWidth: '42px',
+                        height: '80%', 
+                        position: 'relative'
+                      }}
+                    >
+                      {/* Total badge on top of group */}
+                      {d.total > 0 && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '-1.8rem',
+                          fontSize: '0.68rem',
+                          fontWeight: '700',
+                          color: 'var(--accent-amber)',
+                          background: 'rgba(245, 158, 11, 0.12)',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(245, 158, 11, 0.25)',
+                          whiteSpace: 'nowrap',
+                          zIndex: 3
+                        }}>
+                          {d.total >= 1000 ? `${(d.total / 1000).toFixed(1)}k` : d.total.toLocaleString()} ฿
+                        </span>
+                      )}
+
+                      {/* Side-by-side grouped bars for categories in this period */}
+                      <div style={{
+                        display: 'flex',
+                        width: '100%',
+                        height: '100%',
+                        alignItems: 'flex-end',
+                        justify: 'center',
+                        gap: '4px'
+                      }}>
+                        {activeCats.length > 0 ? (
+                          activeCats.map((cat) => {
+                            const cost = d.breakdown[cat] || 0;
+                            const heightPercent = maxCatCost > 0 ? Math.max(8, (cost / maxCatCost) * 100) : 0;
+                            const config = categoriesConfig[cat] || categoriesConfig.others;
+                            
+                            return (
+                              <div
+                                key={cat}
+                                style={{
+                                  flex: 1,
+                                  maxWidth: '28px',
+                                  height: `${heightPercent}%`,
+                                  backgroundColor: config.color,
+                                  borderRadius: '6px 6px 0 0',
+                                  position: 'relative',
+                                  cursor: 'pointer',
+                                  transition: 'transform 0.15s ease, opacity 0.15s ease',
+                                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                                }}
+                                className="grouped-bar-item"
+                                onMouseEnter={(e) => {
+                                  const rect = e.target.getBoundingClientRect();
+                                  setTooltip({
+                                    visible: true,
+                                    x: rect.left + window.scrollX + rect.width / 2,
+                                    y: rect.top + window.scrollY - 8,
+                                    date: chartType === 'daily' ? formatDailyLabel(d.label) : formatMonthlyLabel(d.label),
+                                    category: config.label,
+                                    cost: cost
+                                  });
+                                }}
+                                onMouseLeave={() => setTooltip(prev => ({ ...prev, visible: false }))}
+                              >
+                                {/* Numerical label on top of each bar */}
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '-1.4rem',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  fontSize: '0.62rem',
+                                  fontWeight: '700',
+                                  color: 'var(--text-primary)',
+                                  whiteSpace: 'nowrap',
+                                  pointerEvents: 'none'
+                                }}>
+                                  {cost >= 1000 ? `${(cost / 1000).toFixed(1)}k` : cost.toLocaleString()}
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          // Empty placeholder
+                          <div style={{
+                            width: '16px',
+                            height: '4px',
+                            backgroundColor: 'rgba(255,255,255,0.06)',
+                            borderRadius: '2px',
+                            position: 'relative'
+                          }}>
+                            <span style={{
+                              position: 'absolute',
+                              top: '-1.2rem',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              fontSize: '0.6rem',
+                              color: 'var(--text-muted)'
+                            }}>
+                              0
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      // Empty placeholder to make the bar interactive even if total is 0
-                      <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.02)', borderRadius: '2px' }} />
-                    )}
 
-                    {/* Column Text Label */}
-                    <span style={{ position: 'absolute', bottom: '-1.8rem', fontSize: '0.65rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                      {chartType === 'daily' ? formatDailyLabel(d.label) : formatMonthlyLabel(d.label).split(' ')[0]}
-                    </span>
-                  </div>
-                );
-              })}
+                      {/* Date/Period label under group */}
+                      <span style={{ position: 'absolute', bottom: '-2rem', fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', textAlign: 'center', fontWeight: '500' }}>
+                        {chartType === 'daily' ? formatDailyLabel(d.label) : formatMonthlyLabel(d.label).split(' ')[0]}
+                      </span>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
 
