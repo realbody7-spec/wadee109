@@ -30,12 +30,13 @@ export default function Integrations({ settings, onSaveSettings }) {
 
   // Supabase / PostgreSQL Database States
   const [supabaseDbUrl, setSupabaseDbUrl] = useState(settings.supabaseDbUrl || '');
+  const [supabaseApiKey, setSupabaseApiKey] = useState(settings.supabaseApiKey || '');
   const [testDbStatus, setTestDbStatus] = useState(null);
   const [isTestingDb, setIsTestingDb] = useState(false);
 
   const testAndConnectDb = async () => {
     if (!supabaseDbUrl) {
-      alert('กรุณากรอก Connection String ของ Supabase / PostgreSQL ก่อนทดสอบ');
+      alert('กรุณากรอก Connection String หรือ Supabase Project URL ก่อนทดสอบ');
       return;
     }
     setIsTestingDb(true);
@@ -44,7 +45,10 @@ export default function Integrations({ settings, onSaveSettings }) {
       const response = await fetch('/api/db/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ connectionString: supabaseDbUrl })
+        body: JSON.stringify({ 
+          connectionString: supabaseDbUrl,
+          apiKey: supabaseApiKey
+        })
       });
       const data = await response.json();
       setTestDbStatus({ success: data.success, msg: data.message });
@@ -67,7 +71,8 @@ export default function Integrations({ settings, onSaveSettings }) {
       driveFolderId,
       messengerPageAccessToken,
       messengerRecipientId,
-      supabaseDbUrl
+      supabaseDbUrl,
+      supabaseApiKey
     });
     alert('บันทึกการตั้งค่าการเชื่อมต่อเรียบร้อยแล้ว!');
   };
@@ -1140,19 +1145,32 @@ function setupSheetTemplate(sheet) {
               </button>
             </div>
 
-            <div className="form-group" style={{ marginTop: '0.75rem' }}>
-              <label>Database Connection String (PostgreSQL URI)</label>
-              <input 
-                type="password" 
-                className="form-control"
-                value={supabaseDbUrl}
-                onChange={(e) => setSupabaseDbUrl(e.target.value)}
-                placeholder="เช่น postgresql://postgres:password@db.xxxx.supabase.co:6543/postgres"
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                คัดลอก Connection String จากหน้า Dashboard ของ Supabase (Database &gt; Connection String &gt; URI) เพื่อจัดเก็บข้อมูลบนคลาวด์ออนไลน์แบบถาวร
-              </span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginTop: '0.75rem' }}>
+              <div className="form-group">
+                <label>PostgreSQL URI หรือ Supabase Project URL</label>
+                <input 
+                  type="text" 
+                  className="form-control"
+                  value={supabaseDbUrl}
+                  onChange={(e) => setSupabaseDbUrl(e.target.value)}
+                  placeholder="postgresql://... หรือ https://xxxx.supabase.co"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Supabase API Key (Publishable / Service Key)</label>
+                <input 
+                  type="password" 
+                  className="form-control"
+                  value={supabaseApiKey}
+                  onChange={(e) => setSupabaseApiKey(e.target.value)}
+                  placeholder="เช่น sb_publishable_... หรือ eyJhbGci..."
+                />
+              </div>
             </div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '-0.25rem', display: 'block' }}>
+              สามารถใช้ PostgreSQL Connection String (จากปุ่ม Connect บนสุด) หรือใส่ Supabase Project URL คู่กับ Publishable Key (จากหน้า Settings &gt; API Keys) ก็ได้ครับ
+            </span>
 
             {testDbStatus && (
               <div style={{

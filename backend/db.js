@@ -1,11 +1,14 @@
 import pg from 'pg';
+import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 
 const { Pool } = pg;
 
 let pool = null;
+let supabaseClient = null;
 let isConnected = false;
+let dbMode = 'json'; // 'postgres' | 'supabase_js' | 'json'
 
 // Fallback JSON Paths
 const DATA_DIR = path.join(process.cwd(), 'backend', 'data');
@@ -32,42 +35,64 @@ function saveLocalData(fileName, data) {
   }
 }
 
-export async function initDatabase(connectionString) {
-  const dbUrl = connectionString || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+export async function initDatabase(connectionString, keyInput) {
+  const dbUrl = (connectionString || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || process.env.SUPABASE_URL || '').trim();
+  const apiKey = (keyInput || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '').trim();
   
   if (!dbUrl) {
     console.log('ℹ️ No DATABASE_URL provided. Running with Local JSON storage.');
     isConnected = false;
+    dbMode = 'json';
     return false;
   }
 
-  try {
-    pool = new Pool({
-      connectionString: dbUrl,
-      ssl: dbUrl.includes('localhost') ? false : { rejectUnauthorized: false }
-    });
+  // Option 1: Direct / Pooler PostgreSQL Connection String
+  if (dbUrl.startsWith('postgres://') || dbUrl.startsWith('postgresql://')) {
+    try {
+      pool = new Pool({
+        connectionString: dbUrl,
+        ssl: dbUrl.includes('localhost') ? false : { rejectUnauthorized: false }
+      });
 
-    const client = await pool.connect();
-    console.log('✅ Connected to Supabase / PostgreSQL database successfully!');
-    client.release();
-    isConnected = true;
+      const client = await pool.connect();
+      console.log('✅ Connected to Supabase / PostgreSQL database via Direct/Pooler URI successfully!');
+      client.release();
+      isConnected = true;
+      dbMode = 'postgres';
 
-    // Create Tables
-    await createTables();
-    
-    // Auto-migrate local JSON data if tables are empty
-    await autoMigrateLocalData();
-    
-    return true;
-  } catch (err) {
-    console.error('⚠️ Could not connect to Supabase/PostgreSQL:', err.message);
-    isConnected = false;
-    return false;
+      await createTables();
+      await autoMigrateLocalData();
+      return true;
+    } catch (err) {
+      console.error('⚠️ Could not connect via PostgreSQL URI:', err.message);
+    }
   }
+
+  // Option 2: Supabase API URL + API Key
+  if (dbUrl.startsWith('https://') && apiKey) {
+    try {
+      supabaseClient = createClient(dbUrl, apiKey);
+      const { data, error } = await supabaseClient.from('inventory').select('id').limit(1);
+      if (!error) {
+        console.log('✅ Connected to Supabase via Supabase JS Client successfully!');
+        isConnected = true;
+        dbMode = 'supabase_js';
+        return true;
+      } else {
+        console.error('⚠️ Supabase JS Client test query failed:', error.message);
+      }
+    } catch (err) {
+      console.error('⚠️ Could not connect via Supabase JS Client:', err.message);
+    }
+  }
+
+  isConnected = false;
+  dbMode = 'json';
+  return false;
 }
 
 async function createTables() {
-  if (!pool || !isConnected) return;
+  if (!pool || dbMode !== 'postgres') return;
 
   const createInventoryTable = `
     CREATE TABLE IF NOT EXISTS inventory (
@@ -129,10 +154,9 @@ async function createTables() {
 }
 
 async function autoMigrateLocalData() {
-  if (!pool || !isConnected) return;
+  if (!pool || dbMode !== 'postgres') return;
 
   try {
-    // Check inventory count
     const invRes = await pool.query('SELECT COUNT(*) FROM inventory');
     if (parseInt(invRes.rows[0].count, 10) === 0) {
       const localInv = getLocalData('inventory.json', []);
@@ -162,29 +186,6 @@ async function autoMigrateLocalData() {
         console.log(`✨ Migrated ${localInv.length} inventory items from Local JSON to Supabase PostgreSQL.`);
       }
     }
-
-    // Check users count
-    const userRes = await pool.query('SELECT COUNT(*) FROM users');
-    if (parseInt(userRes.rows[0].count, 10) === 0) {
-      const localUsers = getLocalData('users.json', []);
-      for (const user of localUsers) {
-        await pool.query(
-          `INSERT INTO users (id, username, password, name, role)
-           VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (id) DO NOTHING`,
-          [
-            user.id || `usr-${Date.now()}`,
-            user.username,
-            user.password,
-            user.name || user.username,
-            user.role || 'staff'
-          ]
-        );
-      }
-      if (localUsers.length > 0) {
-        console.log(`✨ Migrated ${localUsers.length} users to Supabase PostgreSQL.`);
-      }
-    }
   } catch (err) {
     console.error('Error during auto-migration:', err);
   }
@@ -194,64 +195,100 @@ export function isDbConnected() {
   return isConnected;
 }
 
+export function getDbMode() {
+  return dbMode;
+}
+
 // --- CRUD Operations ---
 
 export async function getInventoryItems() {
-  if (isConnected && pool) {
-    try {
-      const res = await pool.query('SELECT * FROM inventory ORDER BY date DESC, created_at DESC');
-      return res.rows.map(r => ({
-        id: r.id,
-        date: r.date,
-        name: r.name,
-        category: r.category,
-        quantity: parseFloat(r.quantity) || 0,
-        pieces: parseFloat(r.pieces) || 0,
-        unit: r.unit,
-        cost: parseFloat(r.cost) || 0,
-        billNumber: r.bill_number,
-        image: r.image,
-        portionSize: parseFloat(r.portion_size) || 1,
-        portionUnit: r.portion_unit,
-        associatedPosItem: r.associated_pos_item
-      }));
-    } catch (e) {
-      console.error('Database query error (getInventoryItems):', e);
+  if (isConnected) {
+    if (dbMode === 'postgres' && pool) {
+      try {
+        const res = await pool.query('SELECT * FROM inventory ORDER BY date DESC, created_at DESC');
+        return res.rows.map(r => ({
+          id: r.id,
+          date: r.date,
+          name: r.name,
+          category: r.category,
+          quantity: parseFloat(r.quantity) || 0,
+          pieces: parseFloat(r.pieces) || 0,
+          unit: r.unit,
+          cost: parseFloat(r.cost) || 0,
+          billNumber: r.bill_number,
+          image: r.image,
+          portionSize: parseFloat(r.portion_size) || 1,
+          portionUnit: r.portion_unit,
+          associatedPosItem: r.associated_pos_item
+        }));
+      } catch (e) {
+        console.error('PostgreSQL query error (getInventoryItems):', e);
+      }
+    } else if (dbMode === 'supabase_js' && supabaseClient) {
+      try {
+        const { data, error } = await supabaseClient.from('inventory').select('*').order('date', { ascending: false });
+        if (!error && data) {
+          return data.map(r => ({
+            id: r.id,
+            date: r.date,
+            name: r.name,
+            category: r.category,
+            quantity: parseFloat(r.quantity) || 0,
+            pieces: parseFloat(r.pieces) || 0,
+            unit: r.unit,
+            cost: parseFloat(r.cost) || 0,
+            billNumber: r.billNumber || r.bill_number || '',
+            image: r.image,
+            portionSize: parseFloat(r.portionSize || r.portion_size) || 1,
+            portionUnit: r.portionUnit || r.portion_unit || 'units',
+            associatedPosItem: r.associatedPosItem || r.associated_pos_item || ''
+          }));
+        }
+      } catch (e) {
+        console.error('Supabase JS query error (getInventoryItems):', e);
+      }
     }
   }
   return getLocalData('inventory.json', []);
 }
 
 export async function addInventoryItem(item) {
-  // Always update local data
   const localData = getLocalData('inventory.json', []);
   localData.unshift(item);
   saveLocalData('inventory.json', localData);
   saveLocalData('inventory_backup.json', localData);
 
-  if (isConnected && pool) {
-    try {
-      await pool.query(
-        `INSERT INTO inventory (id, date, name, category, quantity, pieces, unit, cost, bill_number, image, portion_size, portion_unit, associated_pos_item)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-        [
-          item.id,
-          item.date || new Date(),
-          item.name,
-          item.category || 'others',
-          item.quantity || 0,
-          item.pieces || 0,
-          item.unit || 'units',
-          item.cost || 0,
-          item.billNumber || '',
-          item.image || '',
-          item.portionSize || 1,
-          item.portionUnit || item.unit || 'units',
-          item.associatedPosItem || ''
-        ]
-      );
-    } catch (e) {
-      console.error('Database insert error (addInventoryItem):', e);
+  if (isConnected) {
+    if (dbMode === 'postgres' && pool) {
+      try {
+        await pool.query(
+          `INSERT INTO inventory (id, date, name, category, quantity, pieces, unit, cost, bill_number, image, portion_size, portion_unit, associated_pos_item)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [
+            item.id,
+            item.date || new Date(),
+            item.name,
+            item.category || 'others',
+            item.quantity || 0,
+            item.pieces || 0,
+            item.unit || 'units',
+            item.cost || 0,
+            item.billNumber || '',
+            item.image || '',
+            item.portionSize || 1,
+            item.portionUnit || item.unit || 'units',
+            item.associatedPosItem || ''
+          ]
+        );
+      } catch (e) {
+        console.error('PostgreSQL insert error (addInventoryItem):', e);
+      }
+    } else if (dbMode === 'supabase_js' && supabaseClient) {
+      try {
+        await supabaseClient.from('inventory').insert([item]);
+      } catch (e) {
+        console.error('Supabase JS insert error (addInventoryItem):', e);
+      }
     }
   }
   return item;
@@ -266,30 +303,38 @@ export async function updateInventoryItem(id, updatedItem) {
     saveLocalData('inventory_backup.json', localData);
   }
 
-  if (isConnected && pool) {
-    try {
-      await pool.query(
-        `UPDATE inventory 
-         SET date=$1, name=$2, category=$3, quantity=$4, pieces=$5, unit=$6, cost=$7, bill_number=$8, image=$9, portion_size=$10, portion_unit=$11, associated_pos_item=$12
-         WHERE id=$13`,
-        [
-          updatedItem.date,
-          updatedItem.name,
-          updatedItem.category,
-          updatedItem.quantity,
-          updatedItem.pieces,
-          updatedItem.unit,
-          updatedItem.cost,
-          updatedItem.billNumber || '',
-          updatedItem.image || '',
-          updatedItem.portionSize || 1,
-          updatedItem.portionUnit || updatedItem.unit || 'units',
-          updatedItem.associatedPosItem || '',
-          id
-        ]
-      );
-    } catch (e) {
-      console.error('Database update error (updateInventoryItem):', e);
+  if (isConnected) {
+    if (dbMode === 'postgres' && pool) {
+      try {
+        await pool.query(
+          `UPDATE inventory 
+           SET date=$1, name=$2, category=$3, quantity=$4, pieces=$5, unit=$6, cost=$7, bill_number=$8, image=$9, portion_size=$10, portion_unit=$11, associated_pos_item=$12
+           WHERE id=$13`,
+          [
+            updatedItem.date,
+            updatedItem.name,
+            updatedItem.category,
+            updatedItem.quantity,
+            updatedItem.pieces,
+            updatedItem.unit,
+            updatedItem.cost,
+            updatedItem.billNumber || '',
+            updatedItem.image || '',
+            updatedItem.portionSize || 1,
+            updatedItem.portionUnit || updatedItem.unit || 'units',
+            updatedItem.associatedPosItem || '',
+            id
+          ]
+        );
+      } catch (e) {
+        console.error('PostgreSQL update error (updateInventoryItem):', e);
+      }
+    } else if (dbMode === 'supabase_js' && supabaseClient) {
+      try {
+        await supabaseClient.from('inventory').update(updatedItem).eq('id', id);
+      } catch (e) {
+        console.error('Supabase JS update error (updateInventoryItem):', e);
+      }
     }
   }
   return updatedItem;
@@ -301,18 +346,26 @@ export async function deleteInventoryItem(id) {
   saveLocalData('inventory.json', filtered);
   saveLocalData('inventory_backup.json', filtered);
 
-  if (isConnected && pool) {
-    try {
-      await pool.query('DELETE FROM inventory WHERE id=$1', [id]);
-    } catch (e) {
-      console.error('Database delete error (deleteInventoryItem):', e);
+  if (isConnected) {
+    if (dbMode === 'postgres' && pool) {
+      try {
+        await pool.query('DELETE FROM inventory WHERE id=$1', [id]);
+      } catch (e) {
+        console.error('PostgreSQL delete error (deleteInventoryItem):', e);
+      }
+    } else if (dbMode === 'supabase_js' && supabaseClient) {
+      try {
+        await supabaseClient.from('inventory').delete().eq('id', id);
+      } catch (e) {
+        console.error('Supabase JS delete error (deleteInventoryItem):', e);
+      }
     }
   }
   return true;
 }
 
 export async function getUsers() {
-  if (isConnected && pool) {
+  if (isConnected && pool && dbMode === 'postgres') {
     try {
       const res = await pool.query('SELECT * FROM users ORDER BY username ASC');
       if (res.rows.length > 0) {
@@ -325,7 +378,7 @@ export async function getUsers() {
         }));
       }
     } catch (e) {
-      console.error('Database query error (getUsers):', e);
+      console.error('PostgreSQL query error (getUsers):', e);
     }
   }
   return getLocalData('users.json', []);
@@ -333,8 +386,7 @@ export async function getUsers() {
 
 export async function saveUsers(users) {
   saveLocalData('users.json', users);
-
-  if (isConnected && pool) {
+  if (isConnected && pool && dbMode === 'postgres') {
     try {
       for (const u of users) {
         await pool.query(
@@ -346,7 +398,7 @@ export async function saveUsers(users) {
         );
       }
     } catch (e) {
-      console.error('Database save error (saveUsers):', e);
+      console.error('PostgreSQL save error (saveUsers):', e);
     }
   }
   return users;

@@ -125,18 +125,19 @@ app.get('/api/db/status', (req, res) => {
 });
 
 app.post('/api/db/config', async (req, res) => {
-  const { connectionString } = req.body;
+  const { connectionString, apiKey } = req.body;
   const settings = readData(SETTINGS_FILE, {});
   settings.supabaseDbUrl = connectionString || '';
+  settings.supabaseApiKey = apiKey || '';
   writeData(SETTINGS_FILE, settings);
   
-  const connected = await initDatabase(connectionString);
+  const connected = await initDatabase(connectionString, apiKey);
   res.json({
     success: connected,
     connected,
     message: connected 
       ? 'เชื่อมต่อ Supabase / PostgreSQL เรียบร้อยแล้ว!' 
-      : 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ Connection String'
+      : 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ Connection String หรือ Project URL และ API Key'
   });
 });
 
