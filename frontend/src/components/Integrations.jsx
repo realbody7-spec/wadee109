@@ -481,12 +481,15 @@ function doPost(e) {
     
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     
-    // ตรวจสอบว่าแผ่นงานมีหัวตารางคอลัมน์แล้วหรือยัง หากไม่มีให้สร้างอัตโนมัติ
-    if (sheet.getLastColumn() < 4) {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    
+    // ตรวจสอบว่าแผ่นงานมีหัวตารางคอลัมน์แล้วหรือยัง หากแผ่นงานว่างเปล่าจริงๆ ให้สร้างอัตโนมัติ
+    if (sheet.getLastColumn() === 0 || (sheet.getLastRow() === 1 && (sheet.getRange(1, 1).getValue() === "" || sheet.getRange(1, 1).getValue() === null))) {
       setupSheetTemplate(sheet);
     }
     
     var lastCol = sheet.getLastColumn();
+    var headersRow1 = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
     var headersRow2 = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
     var headersRow3 = sheet.getRange(3, 1, 1, lastCol).getValues()[0];
     
@@ -495,16 +498,38 @@ function doPost(e) {
     for (var i = 0; i < lastCol; i++) {
       var itemVal = (headersRow3[i] || '').toString().trim();
       var catVal = (headersRow2[i] || '').toString().trim();
-      columns.push(itemVal !== '' ? itemVal : catVal);
+      var r1Val = (headersRow1[i] || '').toString().trim();
+      columns.push(itemVal !== '' ? itemVal : (catVal !== '' ? catVal : r1Val));
     }
     
-    // ค้นหาคอลัมน์ที่ตรงกับชื่อสินค้า
+    // ค้นหาคอลัมน์คีย์ระบบแบบไดนามิก
+    var piecesColIndex = -1;
+    var discountColIndex = -1;
+    var netPriceColIndex = -1;
+    var receivedColIndex = -1;
+    var checkColIndex = -1;
+    var imageColIndex = -1;
+    
+    for (var i = 0; i < columns.length; i++) {
+      var colName = (columns[i] || '').toString().trim();
+      if (colName === 'จำนวนชิ้น') piecesColIndex = i + 1;
+      else if (colName === 'ส่วนลด') discountColIndex = i + 1;
+      else if (colName === 'ราคาสุทธิ') netPriceColIndex = i + 1;
+      else if (colName === 'รับเงินแล้ว') receivedColIndex = i + 1;
+      else if (colName === 'ตรวจสอบ') checkColIndex = i + 1;
+      else if (colName === 'รูปภาพบิล') imageColIndex = i + 1;
+    }
+    
+    // ค้นหาคอลัมน์ที่ตรงกับชื่อสินค้า (ข้ามหัวตารางระบบ)
+    var systemHeaders = ['วันที่สั่งซื้อ', 'ยอดรวมบิล', 'จำนวน', 'จำนวนชิ้น', 'ส่วนลด', 'ราคาสุทธิ', 'รับเงินแล้ว', 'ตรวจสอบ', 'รูปภาพบิล'];
     var colIndex = -1;
     var itemNameLower = (data.name || '').trim().toLowerCase();
     
     // 1. ค้นหาแบบตรงตัวก่อน (Exact Match)
-    for (var i = 4; i < columns.length; i++) {
-      if (columns[i] && columns[i].toString().trim().toLowerCase() === itemNameLower) {
+    for (var i = 0; i < columns.length; i++) {
+      var h = (columns[i] || '').toString().trim();
+      if (systemHeaders.indexOf(h) !== -1) continue;
+      if (h.toLowerCase() === itemNameLower) {
         colIndex = i + 1;
         break;
       }
@@ -512,39 +537,25 @@ function doPost(e) {
     
     // 2. ค้นหาแบบใกล้เคียงหากไม่เจอตรงตัว (Partial Match)
     if (colIndex === -1 && itemNameLower) {
-      for (var i = 4; i < columns.length; i++) {
-        if (columns[i]) {
-          var headerLower = columns[i].toString().trim().toLowerCase();
-          if (itemNameLower.indexOf(headerLower) !== -1 || headerLower.indexOf(itemNameLower) !== -1) {
-            colIndex = i + 1;
-            break;
-          }
-        }
-      }
-    }
-    
-    // 3. หากยังไม่พบอีก ให้หาช่อง 'อื่นๆ'
-    if (colIndex === -1) {
-      for (var i = 4; i < columns.length; i++) {
-        if (columns[i] && columns[i].toString().trim() === 'อื่นๆ') {
+      for (var i = 0; i < columns.length; i++) {
+        var h = (columns[i] || '').toString().trim();
+        if (systemHeaders.indexOf(h) !== -1) continue;
+        var hLower = h.toLowerCase();
+        if (itemNameLower.indexOf(hLower) !== -1 || hLower.indexOf(itemNameLower) !== -1) {
           colIndex = i + 1;
           break;
         }
       }
     }
     
-    // ค้นหาคอลัมน์คีย์เพิ่มเติม
-    var discountColIndex = -1;
-    var netPriceColIndex = -1;
-    var receivedColIndex = -1;
-    var checkColIndex = -1;
-    
-    for (var i = 4; i < columns.length; i++) {
-      var colName = columns[i].toString().trim();
-      if (colName === 'ส่วนลด') discountColIndex = i + 1;
-      else if (colName === 'ราคาสุทธิ') netPriceColIndex = i + 1;
-      else if (colName === 'รับเงินแล้ว') receivedColIndex = i + 1;
-      else if (colName === 'ตรวจสอบ') checkColIndex = i + 1;
+    // 3. หากยังไม่พบอีก ให้หาช่อง 'อื่นๆ'
+    if (colIndex === -1) {
+      for (var i = 0; i < columns.length; i++) {
+        if ((columns[i] || '').toString().trim() === 'อื่นๆ') {
+          colIndex = i + 1;
+          break;
+        }
+      }
     }
     
     // 🔍 ตรวจสอบสิทธิ์และตัดสินใจว่าจะเขียนแถวเดิมหรือแถวใหม่
@@ -580,7 +591,9 @@ function doPost(e) {
     
     if (writeToSameRow) {
       // 1. ใส่ราคาในช่องคอลัมน์สินค้าที่ถูกต้อง
-      sheet.getRange(lastRow, colIndex).setValue(data.cost || 0);
+      if (colIndex !== -1 && colIndex <= lastCol) {
+        sheet.getRange(lastRow, colIndex).setValue(data.cost || 0);
+      }
       
       // 2. บวกยอดรวมบิลเพิ่ม
       var currentCost = parseFloat(sheet.getRange(lastRow, 2).getValue()) || 0;
@@ -590,9 +603,11 @@ function doPost(e) {
       var currentQty = parseFloat(sheet.getRange(lastRow, 3).getValue()) || 0;
       sheet.getRange(lastRow, 3).setValue(currentQty + (data.quantity || 0));
       
-      // 3.1 บวกจำนวนชิ้นเพิ่ม
-      var currentPieces = parseFloat(sheet.getRange(lastRow, 4).getValue()) || 0;
-      sheet.getRange(lastRow, 4).setValue(currentPieces + (data.pieces || 0));
+      // 3.1 บวกจำนวนชิ้นเพิ่ม (หากมีคอลัมน์จำนวนชิ้น)
+      if (piecesColIndex !== -1) {
+        var currentPieces = parseFloat(sheet.getRange(lastRow, piecesColIndex).getValue()) || 0;
+        sheet.getRange(lastRow, piecesColIndex).setValue(currentPieces + (data.pieces || 0));
+      }
       
       // 4. บวกส่วนลดเพิ่ม (หากมี)
       if (discountColIndex !== -1) {
@@ -608,25 +623,16 @@ function doPost(e) {
       }
       
       // 6. บันทึกรูปภาพ (หากมี)
-      if (driveFileUrl !== '-') {
-        var imageColIndex = -1;
-        for (var i = 4; i < columns.length; i++) {
-          if (columns[i] && columns[i].toString().trim() === 'รูปภาพบิล') {
-            imageColIndex = i + 1;
-            break;
-          }
-        }
-        if (imageColIndex !== -1) {
-          var currentImg = sheet.getRange(lastRow, imageColIndex).getValue();
-          if (currentImg === "" || currentImg === null || currentImg === undefined || currentImg === "-" || currentImg === 0 || currentImg.toString().trim() === "") {
-            sheet.getRange(lastRow, imageColIndex).setValue(driveFileUrl);
-          } else {
-            sheet.getRange(lastRow, imageColIndex).setValue(currentImg + ", " + driveFileUrl);
-          }
+      if (driveFileUrl !== '-' && imageColIndex !== -1) {
+        var currentImg = sheet.getRange(lastRow, imageColIndex).getValue();
+        if (currentImg === "" || currentImg === null || currentImg === undefined || currentImg === "-" || currentImg === 0 || currentImg.toString().trim() === "") {
+          sheet.getRange(lastRow, imageColIndex).setValue(driveFileUrl);
+        } else {
+          sheet.getRange(lastRow, imageColIndex).setValue(currentImg + ", " + driveFileUrl);
         }
       }
     } else {
-      // สร้างแถวข้อมูลใหม่และเติมค่าเริ่มต้น (จำกัดเฉพาะความยาวข้อมูลหลัก ไม่ล้ำเส้นไปถึงตารางสรุปสีเขียว)
+      // สร้างแถวข้อมูลใหม่และเติมค่าเริ่มต้น
       var dataColsLength = (checkColIndex !== -1) ? checkColIndex : (colIndex !== -1 ? colIndex + 3 : lastCol);
       var newRow = [];
       for (var i = 0; i < dataColsLength; i++) {
@@ -646,19 +652,18 @@ function doPost(e) {
       newRow[0] = new Date(data.date || new Date());
       newRow[1] = data.cost || 0;
       newRow[2] = data.quantity || 0;
-      newRow[3] = data.pieces || 0;
+      if (piecesColIndex !== -1) {
+        newRow[piecesColIndex - 1] = data.pieces || 0;
+      }
       
       // ใส่ราคาวัตถุดิบลงในคอลัมน์สินค้าที่ถูกต้อง
       if (colIndex !== -1 && colIndex <= lastCol) {
         newRow[colIndex - 1] = data.cost || 0;
       }
       
-      // ใส่ลิงก์รูปภาพในคอลัมน์สุดท้าย
-      for (var i = 4; i < columns.length; i++) {
-        if (columns[i] && columns[i].toString().trim() === 'รูปภาพบิล') {
-          newRow[i] = driveFileUrl;
-          break;
-        }
+      // ใส่ลิงก์รูปภาพในคอลัมน์รูปภาพบิล
+      if (imageColIndex !== -1) {
+        newRow[imageColIndex - 1] = driveFileUrl;
       }
       
       // ใส่ค่าและสูตรสำหรับ ส่วนลด, ราคาสุทธิ, รับเงินแล้ว, ตรวจสอบ
@@ -723,12 +728,20 @@ function getThaiMonthYear() {
 }
 
 function setupSheetTemplate(sheet) {
+  // ป้องกันการล้างข้อมูลเดิมในกรณีที่มีแถวข้อมูลสินค้าแล้ว (ตั้งแต่แถวที่ 4 เป็นต้นไป)
+  if (sheet.getLastRow() >= 4) {
+    var checkCell = sheet.getRange(4, 1).getValue();
+    if (checkCell !== "" && checkCell !== null && checkCell !== undefined) {
+      return; // ป้องกันการล้างข้อมูลเดิมของลูกค้าโดยเด็ดขาด
+    }
+  }
+  
   sheet.clear();
   
-  // 1. กำหนดหัวตารางหลัก A-C
-  var row1 = ['วันที่สั่งซื้อ', 'ยอดรวมบิล', 'จำนวน'];
-  var row2 = ['', '', ''];
-  var row3 = ['', '', ''];
+  // 1. กำหนดหัวตารางหลัก A-D
+  var row1 = ['วันที่สั่งซื้อ', 'ยอดรวมบิล', 'จำนวน', 'จำนวนชิ้น'];
+  var row2 = ['', '', '', ''];
+  var row3 = ['', '', '', ''];
   
   var schema = [
     { category: 'เครื่องครัว/ของแห้ง', color: '#d9e1f2', items: ['น้ำตาลปี๊บ', 'น้ำตาลทราย', 'งาขาว', 'ชูรส', 'น้ำปลา', 'น้ำส้มสายชู', 'น้ำปลาร้า', 'น้ำมัน', 'น้ำมันงา', 'ซอสมะเขือ', 'ซอสพริก', 'มายองเนส', 'น้ำจิ้มบ๊วย', 'ซอสสูตร5', 'ซอสหอยนางรม', 'ซีอิ๊วฉลากแดง', 'ซีอิ๊วขาว สูตร1', 'ซอสฝาเขียว', 'เบกกิ้งโซดา', 'ไวไว', 'มาม่า', 'หมี่หยก', 'วุ้นเส้น', 'ข้าวสาร', 'ข้าวคั่ว', 'ผงมะนาว', 'กระเทียมดอง', 'น้ำมะขาม', 'พริกป่น', 'โชยุ', 'วาซาบิ', 'เกลือ', 'น้ำยาล้างจาน', 'ผงซักฟอก', 'ถุงขยะ 18*20', 'ถุงหิ้ว 12*26', 'ถุงร้อน 8*12', 'ถุงหิ้ว 8*16', 'ไข่ไก่', 'เต้าหู้ไข่'] },
