@@ -873,6 +873,124 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
   sheet.setRowHeight(startRow, 30);
   sheet.setRowHeight(startRow + 1, 35);
   sheet.setRowHeight(startRow + 2, 35);
+
+  // ตั้งค่ากลุ่มคอลัมน์ (Grouping) เพื่อให้ยุบได้แบบในภาพ
+  for (var m = 0; m < mergeRangesRow2.length; m++) {
+    var r = mergeRangesRow2[m];
+    if (r.startCol < r.endCol) {
+      try {
+        sheet.getRange(startRow, r.startCol + 1, 1, r.endCol - r.startCol).shiftColumnGroupDepth(1);
+      } catch (e) {
+        // ข้ามหากติดปัญหา
+      }
+    }
+  }
+  
+  try {
+    sheet.collapseAllColumnGroups();
+  } catch (e) {
+    // ข้ามหากไม่สามารถยุบได้
+  }
+
+  // --- การสร้างตารางสรุปด้านข้างสีเขียว (สรุปรายจ่ายประจำเดือน) ---
+  var summaryStartCol = colIndex + 4;
+  
+  function getRangeFormula(startIdx, endIdx) {
+    var sCol = 5;
+    for (var i = 0; i < startIdx; i++) {
+      sCol += schema[i].items.length;
+    }
+    var eCol = sCol;
+    for (var i = startIdx; i <= endIdx; i++) {
+      eCol += schema[i].items.length;
+    }
+    eCol = eCol - 1;
+    
+    var startLetter = getColumnLetter(sCol);
+    var endLetter = getColumnLetter(eCol);
+    return "=SUM(" + startLetter + ":" + endLetter + ")";
+  }
+  
+  var discountLetter = getColumnLetter(colIndex);
+  var netLetter = getColumnLetter(colIndex + 1);
+  var receivedLetter = getColumnLetter(colIndex + 2);
+  var checkLetter = getColumnLetter(colIndex + 3);
+  
+  // กำหนดจัดฟอร์แมตข้อมูลอัตโนมัติสำหรับทั้งคอลัมน์
+  try {
+    sheet.getRange("B4:B").setNumberFormat("#,##0.00");
+    sheet.getRange(discountLetter + "4:" + discountLetter).setNumberFormat("#,##0.00");
+    sheet.getRange(netLetter + "4:" + netLetter).setNumberFormat("#,##0.00");
+    sheet.getRange(receivedLetter + "4:" + receivedLetter).setNumberFormat("#,##0.00");
+    sheet.getRange(checkLetter + "4:" + checkLetter).setHorizontalAlignment("center");
+  } catch (e) {}
+
+  var summaryRows = [
+    ["เครื่องครัว/ของแห้ง", getRangeFormula(0, 0)],
+    ["ผัก", getRangeFormula(1, 1)],
+    ["เนื้อหมู / ไก่", getRangeFormula(2, 2)],
+    ["เนื้อวัว", getRangeFormula(3, 3)],
+    ["ทะเล", getRangeFormula(4, 4)],
+    ["ของทอด", getRangeFormula(5, 5)],
+    ["น้ำจิ้ม", getRangeFormula(6, 6)],
+    ["เครื่องดื่ม", getRangeFormula(7, 7)],
+    ["Asset", getRangeFormula(8, 8)],
+    ["เงินเดือน", getRangeFormula(9, 9)],
+    ["ค่าส่งของ", getRangeFormula(10, 10)],
+    ["น้ำแข็ง", getRangeFormula(11, 11)],
+    ["แก๊ส / ถ่าน", getRangeFormula(12, 13)],
+    ["ค่าน้ำ + ค่าไฟ + เน็ต", getRangeFormula(14, 14)],
+    ["การตลาด/ปรับปรุงร้าน", getRangeFormula(15, 15)],
+    ["ส่วนลด", "=SUM(" + discountLetter + ":" + discountLetter + ")"]
+  ];
+  
+  var summaryStartRow = startRow + 3;
+  
+  // 1. หัวตารางสรุป
+  sheet.getRange(summaryStartRow, summaryStartCol, 1, 2).merge().setValue("สรุปรายจ่าย " + monthStr);
+  sheet.getRange(summaryStartRow, summaryStartCol + 2).setValue("% ของรายจ่าย");
+  
+  var totalRowNum = summaryStartRow + 1 + summaryRows.length;
+  var valColLetter = getColumnLetter(summaryStartCol + 1);
+  var pctColLetter = getColumnLetter(summaryStartCol + 2);
+  var totalCellRef = "$" + valColLetter + "$" + totalRowNum;
+  
+  // 2. เติมข้อมูลแถวในตารางสรุป
+  for (var idx = 0; idx < summaryRows.length; idx++) {
+    var rNum = summaryStartRow + 1 + idx;
+    sheet.getRange(rNum, summaryStartCol).setValue(summaryRows[idx][0]);
+    sheet.getRange(rNum, summaryStartCol + 1).setFormula(summaryRows[idx][1]);
+    sheet.getRange(rNum, summaryStartCol + 2).setFormula("=" + valColLetter + rNum + "/" + totalCellRef);
+  }
+  
+  // 3. แถว Total สรุปผลลัพธ์
+  var firstValRow = summaryStartRow + 1;
+  var lastValRow = summaryStartRow + summaryRows.length;
+  sheet.getRange(totalRowNum, summaryStartCol).setValue("Total");
+  sheet.getRange(totalRowNum, summaryStartCol + 1).setFormula("=SUM(" + valColLetter + firstValRow + ":" + valColLetter + lastValRow + ")");
+  sheet.getRange(totalRowNum, summaryStartCol + 2).setFormula("=SUM(" + pctColLetter + firstValRow + ":" + pctColLetter + lastValRow + ")");
+  
+  // 4. สไตล์ตารางสรุป (สีพื้นหลังเขียวสดใส, สไตล์ตัวอักษร, เส้นขอบ)
+  var summaryTableRange = sheet.getRange(summaryStartRow, summaryStartCol, summaryRows.length + 2, 3);
+  summaryTableRange.setBackground("#00ff00");
+  summaryTableRange.setFontColor("#000000");
+  summaryTableRange.setBorder(true, true, true, true, true, true);
+  
+  var summaryHeaderRange = sheet.getRange(summaryStartRow, summaryStartCol, 1, 3);
+  summaryHeaderRange.setFontWeight("bold");
+  summaryHeaderRange.setHorizontalAlignment("center");
+  
+  var summaryTotalRange = sheet.getRange(totalRowNum, summaryStartCol, 1, 3);
+  summaryTotalRange.setFontWeight("bold");
+  
+  // จัดประเภทตัวเลขในตารางสรุป
+  sheet.getRange(firstValRow, summaryStartCol + 1, summaryRows.length + 1, 1).setNumberFormat("#,##0.00");
+  sheet.getRange(firstValRow, summaryStartCol + 2, summaryRows.length + 1, 1).setNumberFormat("0.00%");
+  
+  // ปรับความกว้างคอลัมน์สรุป
+  sheet.autoResizeColumn(summaryStartCol);
+  sheet.autoResizeColumn(summaryStartCol + 1);
+  sheet.autoResizeColumn(summaryStartCol + 2);
 }
 
 function setupSheetTemplate(sheet) {
