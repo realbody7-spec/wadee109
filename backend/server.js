@@ -15,6 +15,16 @@ import {
 } from './scheduler.js';
 import { sendLineNotify, sendLinePush, sendLineReply } from './services/lineService.js';
 import { sendMessengerMessage } from './services/messengerService.js';
+import {
+  initDatabase,
+  isDbConnected,
+  getInventoryItems,
+  addInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
+  getUsers,
+  saveUsers
+} from './db.js';
 
 dotenv.config();
 
@@ -87,30 +97,46 @@ function writeData(filePath, data) {
   }
 }
 
-// --- Status & Local DB Backup API ---
+// --- Status & Local/Cloud DB API ---
 app.get('/api/status', (req, res) => {
   res.json({
     status: "online",
     message: "Welcome to the Restaurant SOP Notifier Backend API",
+    dbStatus: isDbConnected() ? "Supabase / PostgreSQL (Cloud)" : "Local JSON",
     endpoints: {
       sops: "/api/sops",
       schedules: "/api/schedules",
       settings: "/api/settings",
       logs: "/api/logs",
       inventory: "/api/inventory",
-      backup: "/api/inventory/backup"
+      dbStatus: "/api/db/status"
     }
   });
 });
 
-app.get('/api/inventory/backup', (req, res) => {
-  const backupPath = path.join(DATA_DIR, 'inventory_backup.json');
-  const backupData = readData(backupPath, readData(INVENTORY_FILE, []));
+app.get('/api/db/status', (req, res) => {
+  const connected = isDbConnected();
+  const settings = readData(SETTINGS_FILE, {});
   res.json({
-    success: true,
-    count: backupData.length,
-    backupFile: 'inventory_backup.json',
-    items: backupData
+    connected,
+    dbType: connected ? 'Supabase / PostgreSQL (Cloud Database)' : 'Local JSON Database',
+    hasConfig: !!(settings.supabaseDbUrl || process.env.DATABASE_URL)
+  });
+});
+
+app.post('/api/db/config', async (req, res) => {
+  const { connectionString } = req.body;
+  const settings = readData(SETTINGS_FILE, {});
+  settings.supabaseDbUrl = connectionString || '';
+  writeData(SETTINGS_FILE, settings);
+  
+  const connected = await initDatabase(connectionString);
+  res.json({
+    success: connected,
+    connected,
+    message: connected 
+      ? 'เชื่อมต่อ Supabase / PostgreSQL เรียบร้อยแล้ว!' 
+      : 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบ Connection String'
   });
 });
 
@@ -249,6 +275,12 @@ app.delete('/api/schedules/:id', (req, res) => {
   const filtered = schedules.filter(s => s.id !== req.params.id);
   writeData(SCHEDULES_FILE, filtered);
   reloadSchedules();
+  res.json({ success: true });
+});
+
+app.delete('/api/inventory/:id', async (req, res) => {
+  const id = req.params.id;
+  await deleteInventoryItem(id);
   res.json({ success: true });
 });
 
@@ -417,12 +449,13 @@ app.delete('/api/logs', (req, res) => {
 });
 
 // --- INVENTORY API ---
-app.get('/api/inventory', (req, res) => {
-  res.json(readData(INVENTORY_FILE, []));
+app.get('/api/inventory', async (req, res) => {
+  const items = await getInventoryItems();
+  res.json(items);
 });
 
-app.post('/api/inventory', (req, res) => {
-  const items = readData(INVENTORY_FILE, []);
+app.post('/api/inventory', async (req, res) => {
+  const items = await getInventoryItems();
   
   let imagePath = null;
   if (req.body.image && req.body.image.startsWith('data:image/')) {
@@ -465,8 +498,8 @@ app.post('/api/inventory', (req, res) => {
     portionUnit: req.body.portionUnit || req.body.unit || 'units',
     associatedPosItem: req.body.associatedPosItem || ''
   };
-  items.push(newItem);
-  writeData(INVENTORY_FILE, items);
+  
+  await addInventoryItem(newItem);
 
   // Sync to Google Sheets if webhook URL is configured
   const settings = readData(SETTINGS_FILE, {});
@@ -499,14 +532,14 @@ app.post('/api/inventory', (req, res) => {
           console.log(`[Google Drive] Image saved: ${driveUrl}`);
 
           // Update local database item with Google Drive URL
-          const currentItems = readData(INVENTORY_FILE, []);
+          const currentItems = await getInventoryItems();
           const updatedItems = currentItems.map(item => {
             if (item.id === newItem.id) {
               return { ...item, image: driveUrl };
             }
             return item;
           });
-          writeData(INVENTORY_FILE, updatedItems);
+          await updateInventoryItem(newItem.id, updatedItems.find(i => i.id === newItem.id));
 
           // Delete local file to save space on disk
           if (imagePath && imagePath.startsWith('/uploads/')) {
@@ -527,111 +560,6 @@ app.post('/api/inventory', (req, res) => {
   }
 
   res.status(201).json(newItem);
-});
-
-app.put('/api/inventory/:id', (req, res) => {
-  const userRole = req.headers['x-user-role'];
-  if (userRole !== 'admin' && userRole !== 'manager') {
-    return res.status(403).json({ error: 'สิทธิ์การใช้งานไม่ถูกต้อง เฉพาะแอดมินหรือผู้จัดการเท่านั้น' });
-  }
-
-  const items = readData(INVENTORY_FILE, []);
-  const itemIndex = items.findIndex(item => item.id === req.params.id);
-  
-  if (itemIndex === -1) {
-    return res.status(404).json({ error: 'ไม่พบข้อมูลวัตถุดิบนี้ในระบบ' });
-  }
-
-  let imagePath = items[itemIndex].image;
-  if (req.body.image && req.body.image.startsWith('data:image/')) {
-    try {
-      const matches = req.body.image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (matches && matches.length === 3) {
-        const ext = matches[1].split('/')[1] || 'jpeg';
-        const dataBuffer = Buffer.from(matches[2], 'base64');
-        
-        const uploadDir = path.join(__dirname, 'public', 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        
-        const filename = `bill-${Date.now()}.${ext}`;
-        const filepath = path.join(uploadDir, filename);
-        fs.writeFileSync(filepath, dataBuffer);
-        
-        // Delete old local image if it existed
-        if (items[itemIndex].image && items[itemIndex].image.startsWith('/uploads/')) {
-          const oldPath = path.join(__dirname, 'public', 'uploads', path.basename(items[itemIndex].image));
-          if (fs.existsSync(oldPath)) {
-            fs.unlinkSync(oldPath);
-          }
-        }
-        
-        imagePath = `/uploads/${filename}`;
-      }
-    } catch (err) {
-      console.error('Error saving image file:', err);
-    }
-  } else if (req.body.image === null || req.body.image === '') {
-    // Delete old local image if it was cleared
-    if (items[itemIndex].image && items[itemIndex].image.startsWith('/uploads/')) {
-      try {
-        const oldPath = path.join(__dirname, 'public', 'uploads', path.basename(items[itemIndex].image));
-        if (fs.existsSync(oldPath)) {
-          fs.unlinkSync(oldPath);
-        }
-      } catch (e) {}
-    }
-    imagePath = null;
-  } else if (req.body.image) {
-    imagePath = req.body.image;
-  }
-
-  const updatedItem = {
-    ...items[itemIndex],
-    date: req.body.date || items[itemIndex].date,
-    name: req.body.name || items[itemIndex].name,
-    category: req.body.category || items[itemIndex].category,
-    quantity: parseFloat(req.body.quantity) || 0,
-    pieces: parseFloat(req.body.pieces) || 0,
-    unit: req.body.unit || items[itemIndex].unit,
-    cost: parseFloat(req.body.cost) || 0,
-    billNumber: req.body.billNumber || '',
-    image: imagePath,
-    portionSize: parseFloat(req.body.portionSize) || items[itemIndex].portionSize || 1,
-    portionUnit: req.body.portionUnit || items[itemIndex].portionUnit || 'units',
-    associatedPosItem: req.body.associatedPosItem || ''
-  };
-
-  items[itemIndex] = updatedItem;
-  writeData(INVENTORY_FILE, items);
-  res.json(updatedItem);
-});
-
-app.delete('/api/inventory/:id', (req, res) => {
-  const userRole = req.headers['x-user-role'];
-  if (userRole !== 'admin' && userRole !== 'manager') {
-    return res.status(403).json({ error: 'สิทธิ์การใช้งานไม่ถูกต้อง เฉพาะแอดมินหรือผู้จัดการเท่านั้น' });
-  }
-
-  const items = readData(INVENTORY_FILE, []);
-  const itemToDelete = items.find(item => item.id === req.params.id);
-  
-  if (itemToDelete && itemToDelete.image && itemToDelete.image.startsWith('/uploads/')) {
-    try {
-      const filename = path.basename(itemToDelete.image);
-      const filepath = path.join(__dirname, 'public', 'uploads', filename);
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-    } catch (err) {
-      console.error('Error deleting image file:', err);
-    }
-  }
-
-  const filtered = items.filter(item => item.id !== req.params.id);
-  writeData(INVENTORY_FILE, filtered);
-  res.json({ success: true });
 });
 
 // --- POS SALES API ---
@@ -661,8 +589,73 @@ app.delete('/api/pos-sales', (req, res) => {
 });
 
 // --- RECONCILIATION API ---
-app.get('/api/reconciliation', (req, res) => {
-  const inventory = readData(INVENTORY_FILE, []);
+app.put('/api/inventory/:id', async (req, res) => {
+  const id = req.params.id;
+  const items = await getInventoryItems();
+  const posSales = readData(POS_SALES_FILE, []);
+
+  // 1. Group inventory items by name and calculate potential servings
+  const rawMaterialSummary = {};
+  
+  const itemIndex = items.findIndex(item => item.id === id);
+  if (itemIndex === -1) {
+    return res.status(404).json({ error: 'ไม่พบข้อมูลวัตถุดิบนี้ในระบบ' });
+  }
+
+  // Handle Image Logic
+  let imagePath = items[itemIndex].image;
+  if (req.body.image && req.body.image.startsWith('data:image/')) {
+    try {
+      const matches = req.body.image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        const ext = matches[1].split('/')[1] || 'jpeg';
+        const dataBuffer = Buffer.from(matches[2], 'base64');
+        const uploadDir = path.join(__dirname, 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        const filename = `bill-${Date.now()}.${ext}`;
+        const filepath = path.join(uploadDir, filename);
+        fs.writeFileSync(filepath, dataBuffer);
+        if (items[itemIndex].image && items[itemIndex].image.startsWith('/uploads/')) {
+          const oldPath = path.join(__dirname, 'public', 'uploads', path.basename(items[itemIndex].image));
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
+        imagePath = `/uploads/${filename}`;
+      }
+    } catch (err) { console.error('Error saving image file:', err); }
+  } else if (req.body.image === null || req.body.image === '') {
+    if (items[itemIndex].image && items[itemIndex].image.startsWith('/uploads/')) {
+      try {
+        const oldPath = path.join(__dirname, 'public', 'uploads', path.basename(items[itemIndex].image));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      } catch (e) {}
+    }
+    imagePath = null;
+  } else if (req.body.image) {
+    imagePath = req.body.image;
+  }
+
+  const updatedItem = {
+    ...items[itemIndex],
+    date: req.body.date || items[itemIndex].date,
+    name: req.body.name || items[itemIndex].name,
+    category: req.body.category || items[itemIndex].category,
+    quantity: parseFloat(req.body.quantity) || 0,
+    pieces: parseFloat(req.body.pieces) || 0,
+    unit: req.body.unit || items[itemIndex].unit,
+    cost: parseFloat(req.body.cost) || 0,
+    billNumber: req.body.billNumber || '',
+    image: imagePath,
+    portionSize: parseFloat(req.body.portionSize) || items[itemIndex].portionSize || 1,
+    portionUnit: req.body.portionUnit || items[itemIndex].portionUnit || 'units',
+    associatedPosItem: req.body.associatedPosItem || ''
+  };
+
+  await updateInventoryItem(id, updatedItem);
+  res.json(updatedItem);
+});
+
+app.get('/api/reconciliation', async (req, res) => {
+  const inventory = await getInventoryItems();
   const posSales = readData(POS_SALES_FILE, []);
 
   // 1. Group inventory items by name and calculate potential servings
@@ -910,8 +903,12 @@ app.get('*', (req, res) => {
 });
 
 // Start server and cron scheduler
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`[Server] Backend running on http://localhost:${PORT}`);
+  
+  // Initialize Database (Supabase PostgreSQL / Local JSON)
+  const settings = readData(SETTINGS_FILE, {});
+  await initDatabase(settings.supabaseDbUrl || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL);
   
   // Run user roles migration / initialization
   try {

@@ -28,6 +28,33 @@ export default function Integrations({ settings, onSaveSettings }) {
   const [testMessengerStatus, setTestMessengerStatus] = useState(null);
   const [isTestingMessenger, setIsTestingMessenger] = useState(false);
 
+  // Supabase / PostgreSQL Database States
+  const [supabaseDbUrl, setSupabaseDbUrl] = useState(settings.supabaseDbUrl || '');
+  const [testDbStatus, setTestDbStatus] = useState(null);
+  const [isTestingDb, setIsTestingDb] = useState(false);
+
+  const testAndConnectDb = async () => {
+    if (!supabaseDbUrl) {
+      alert('กรุณากรอก Connection String ของ Supabase / PostgreSQL ก่อนทดสอบ');
+      return;
+    }
+    setIsTestingDb(true);
+    setTestDbStatus(null);
+    try {
+      const response = await fetch('/api/db/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionString: supabaseDbUrl })
+      });
+      const data = await response.json();
+      setTestDbStatus({ success: data.success, msg: data.message });
+    } catch (err) {
+      setTestDbStatus({ success: false, msg: 'ไม่สามารถทดสอบการเชื่อมต่อได้' });
+    } finally {
+      setIsTestingDb(false);
+    }
+  };
+
   const handleSaveAll = (e) => {
     e.preventDefault();
     onSaveSettings({
@@ -39,7 +66,8 @@ export default function Integrations({ settings, onSaveSettings }) {
       googleSheetWebhookUrl,
       driveFolderId,
       messengerPageAccessToken,
-      messengerRecipientId
+      messengerRecipientId,
+      supabaseDbUrl
     });
     alert('บันทึกการตั้งค่าการเชื่อมต่อเรียบร้อยแล้ว!');
   };
@@ -1087,6 +1115,61 @@ function setupSheetTemplate(sheet) {
               }}>
                 {testMessengerStatus.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
                 <span>{testMessengerStatus.msg}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Supabase / PostgreSQL Section */}
+        <div className="card">
+          <div className="channel-setting-card" style={{ border: 'none', background: 'transparent', padding: 0, margin: 0 }}>
+            <div className="channel-header">
+              <div className="channel-name" style={{ color: 'var(--accent-green)', fontWeight: '700' }}>
+                <ShieldCheck size={22} style={{ color: 'var(--accent-green)' }} />
+                <span>Supabase / PostgreSQL Cloud Database Integration</span>
+              </div>
+              <button 
+                type="button" 
+                className="btn btn-secondary"
+                disabled={isTestingDb}
+                onClick={testAndConnectDb}
+                style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+              >
+                {isTestingDb ? 'กำลังทดสอบ...' : 'ทดสอบ & เชื่อมต่อ DB'}
+                <Send size={12} style={{ marginLeft: '0.4rem' }} />
+              </button>
+            </div>
+
+            <div className="form-group" style={{ marginTop: '0.75rem' }}>
+              <label>Database Connection String (PostgreSQL URI)</label>
+              <input 
+                type="password" 
+                className="form-control"
+                value={supabaseDbUrl}
+                onChange={(e) => setSupabaseDbUrl(e.target.value)}
+                placeholder="เช่น postgresql://postgres:password@db.xxxx.supabase.co:6543/postgres"
+              />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                คัดลอก Connection String จากหน้า Dashboard ของ Supabase (Database &gt; Connection String &gt; URI) เพื่อจัดเก็บข้อมูลบนคลาวด์ออนไลน์แบบถาวร
+              </span>
+            </div>
+
+            {testDbStatus && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontSize: '0.85rem',
+                padding: '0.65rem 1rem',
+                borderRadius: '8px',
+                backgroundColor: testDbStatus.success ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: testDbStatus.success ? 'var(--accent-green)' : 'var(--accent-danger)',
+                border: '1px solid',
+                borderColor: testDbStatus.success ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                marginTop: '0.5rem'
+              }}>
+                {testDbStatus.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                <span>{testDbStatus.msg}</span>
               </div>
             )}
           </div>
