@@ -457,8 +457,9 @@ export default function Integrations({ settings, onSaveSettings }) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     setupSheetTemplate(sheet);
+    repairAllMonthlyHeaders(sheet);
     recalculateAllMonthlySummaries(sheet);
-    return ContentService.createTextOutput("อัปเดตและจัดขอบเขตสูตรสรุปรายจ่ายประจำเดือนสำเร็จเรียบร้อยแล้ว! สามารถเปิดดูใน Google Sheet ของคุณได้เลยครับ").setMimeType(ContentService.MimeType.TEXT);
+    return ContentService.createTextOutput("อัปเดต ซ่อมแซมหัวตารางประจำเดือน และจัดขอบเขตสูตรสรุปรายจ่ายสำเร็จเรียบร้อยแล้ว! สามารถเปิดดูใน Google Sheet ของคุณได้เลยครับ").setMimeType(ContentService.MimeType.TEXT);
   } catch (err) {
     return ContentService.createTextOutput("เกิดข้อผิดพลาด: " + err.toString()).setMimeType(ContentService.MimeType.TEXT);
   }
@@ -1129,6 +1130,56 @@ function setupSheetTemplate(sheet) {
   createMonthlyHeaderBlock(sheet, 1, getThaiMonthYear());
   sheet.setFrozenRows(3);
   sheet.setFrozenColumns(3);
+}
+
+function repairAllMonthlyHeaders(sheet) {
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 3) return;
+  
+  var values = sheet.getRange("A1:A" + Math.max(lastRow, 100)).getValues();
+  for (var i = 0; i < values.length; i++) {
+    var val = (values[i][0] || '').toString();
+    if (val.indexOf('วันที่สั่งซื้อ') === 0) {
+      var sRow = i + 1;
+      var monthStr = val.replace('วันที่สั่งซื้อ', '').replace('(', '').replace(')', '').trim();
+      if (!monthStr) monthStr = getThaiMonthYear();
+      
+      var checkColD_row2 = sheet.getRange(sRow + 1, 4).getValue().toString().trim();
+      var checkColD_row1 = sheet.getRange(sRow, 4).getValue().toString().trim();
+      
+      if (checkColD_row2 === 'จำนวนชิ้น' || checkColD_row1 === 'จำนวนชิ้น') {
+        var dStart = sRow + 3;
+        var nextHeaderIndex = -1;
+        for (var j = i + 1; j < values.length; j++) {
+          if ((values[j][0] || '').toString().indexOf('วันที่สั่งซื้อ') === 0) {
+            nextHeaderIndex = j;
+            break;
+          }
+        }
+        var dEnd = (nextHeaderIndex !== -1) ? (nextHeaderIndex) : sheet.getLastRow();
+        
+        if (dEnd >= dStart) {
+          for (var r = dStart; r <= dEnd; r++) {
+            try {
+              var rowVals = sheet.getRange(r, 4, 1, sheet.getLastColumn() - 3).getValues()[0];
+              if ((rowVals[0] === '' || rowVals[0] === null) && rowVals[1] !== '' && rowVals[1] !== null) {
+                rowVals.shift();
+                rowVals.push('');
+                sheet.getRange(r, 4, 1, rowVals.length).setValues([rowVals]);
+              }
+            } catch(e) {}
+          }
+        }
+        
+        try {
+          sheet.getRange(sRow, 1, 3, sheet.getLastColumn()).breakApart();
+        } catch (e) {}
+        
+        createMonthlyHeaderBlock(sheet, sRow, monthStr);
+      }
+    }
+  }
 }`}
                 onClick={(e) => {
                   e.target.select();
