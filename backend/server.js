@@ -300,7 +300,7 @@ app.get('/api/settings', (req, res) => {
   res.json(readData(SETTINGS_FILE, {}));
 });
 
-app.put('/api/settings', (req, res) => {
+app.put('/api/settings', async (req, res) => {
   const currentSettings = readData(SETTINGS_FILE, {});
   const newSettings = {
     ...currentSettings,
@@ -312,9 +312,16 @@ app.put('/api/settings', (req, res) => {
     googleSheetWebhookUrl: req.body.googleSheetWebhookUrl ?? currentSettings.googleSheetWebhookUrl,
     driveFolderId: req.body.driveFolderId !== undefined ? extractDriveFolderId(req.body.driveFolderId) : currentSettings.driveFolderId,
     messengerPageAccessToken: req.body.messengerPageAccessToken ?? currentSettings.messengerPageAccessToken,
-    messengerRecipientId: req.body.messengerRecipientId ?? currentSettings.messengerRecipientId
+    messengerRecipientId: req.body.messengerRecipientId ?? currentSettings.messengerRecipientId,
+    supabaseDbUrl: req.body.supabaseDbUrl ?? currentSettings.supabaseDbUrl,
+    supabaseApiKey: req.body.supabaseApiKey ?? currentSettings.supabaseApiKey
   };
   writeData(SETTINGS_FILE, newSettings);
+  
+  if (newSettings.supabaseDbUrl) {
+    await initDatabase(newSettings.supabaseDbUrl, newSettings.supabaseApiKey);
+  }
+  
   res.json(newSettings);
 });
 
