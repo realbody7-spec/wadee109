@@ -10,7 +10,8 @@ import {
   Package,
   TrendingUp,
   BarChart3,
-  ArrowUpRight
+  ArrowUpRight,
+  X
 } from 'lucide-react';
 
 export default function Dashboard({ sops, schedules, logs, settings, onTriggerSchedule, setView, inventory = [], reconciliation = [], role = 'admin', setInventoryFilterName }) {
@@ -20,11 +21,14 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
   const totalNotifications = logs.length;
   const isSimulation = settings.simulationMode;
 
-  // Chart configuration
+  // Chart & Drill-Down Configuration
   const [chartType, setChartType] = useState('daily'); // 'daily' | 'monthly'
   const [daysRange, setDaysRange] = useState(7); // 7 | 15 | 30
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, date: '', category: '', cost: 0 });
+  const [selectedCategoryModal, setSelectedCategoryModal] = useState(null);
+  const [hoveredCategoryKey, setHoveredCategoryKey] = useState(null);
+  const [modalSearchText, setModalSearchText] = useState('');
 
   // Map of categories to labels and colors
   const categoriesConfig = {
@@ -556,6 +560,329 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* NEW: Interactive Donut Chart & Category Breakdown Card (Matching User Request Screenshot) */}
+      {(role === 'admin' || role === 'manager') && (
+        <div className="card card-accent-green" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ fontSize: '1.5rem', lineHeight: 1 }}>🍕</div>
+              <div>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                  สัดส่วนวัตถุดิบและรายจ่ายของร้าน <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>(คลิกที่สีเพื่อเจาะดู)</span>
+                </h2>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>คลิกที่วงกลมหรือชื่อหมวดหมู่ด้านขวาเพื่อเปิดดูรายการสินค้าที่สั่งซื้อโดยละเอียด</p>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '2rem', alignItems: 'center' }}>
+            {/* Left Side: Interactive SVG Donut Chart */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', minHeight: '260px' }}>
+              <svg width="240" height="240" viewBox="0 0 240 240">
+                <g transform="rotate(-90 120 120)">
+                  {(() => {
+                    const radius = 75;
+                    const strokeWidth = 34;
+                    const circumference = 2 * Math.PI * radius;
+                    let accumulatedPercent = 0;
+
+                    const activeCatKeys = Object.keys(periodCatCosts).filter(cat => periodCatCosts[cat] > 0);
+                    if (activeCatKeys.length === 0 || periodTotal === 0) {
+                      return (
+                        <circle 
+                          cx="120" 
+                          cy="120" 
+                          r={radius} 
+                          fill="transparent" 
+                          stroke="var(--border-card)" 
+                          strokeWidth={strokeWidth} 
+                        />
+                      );
+                    }
+
+                    return activeCatKeys.map((catKey) => {
+                      const cost = periodCatCosts[catKey];
+                      const percent = cost / periodTotal;
+                      const dashArray = `${percent * circumference} ${circumference}`;
+                      const dashOffset = -accumulatedPercent * circumference;
+                      accumulatedPercent += percent;
+
+                      const config = categoriesConfig[catKey] || categoriesConfig.others;
+                      const isHovered = hoveredCategoryKey === catKey;
+
+                      return (
+                        <circle
+                          key={catKey}
+                          cx="120"
+                          cy="120"
+                          r={radius}
+                          fill="transparent"
+                          stroke={config.color}
+                          strokeWidth={isHovered ? strokeWidth + 6 : strokeWidth}
+                          strokeDasharray={dashArray}
+                          strokeDashoffset={dashOffset}
+                          style={{
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            opacity: hoveredCategoryKey && !isHovered ? 0.45 : 1,
+                            filter: isHovered ? 'drop-shadow(0 0 6px rgba(0,0,0,0.3))' : 'none'
+                          }}
+                          onMouseEnter={() => setHoveredCategoryKey(catKey)}
+                          onMouseLeave={() => setHoveredCategoryKey(null)}
+                          onClick={() => {
+                            setSelectedCategoryModal(catKey);
+                            setModalSearchText('');
+                          }}
+                        >
+                          <title>{`${config.label}: ฿${cost.toLocaleString()} (${(percent * 100).toFixed(1)}%) - คลิกเพื่อเจาะดู`}</title>
+                        </circle>
+                      );
+                    });
+                  })()}
+                </g>
+              </svg>
+
+              {/* Center Label inside Donut Ring */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                textAlign: 'center',
+                pointerEvents: 'none'
+              }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '600' }}>
+                  {hoveredCategoryKey ? (categoriesConfig[hoveredCategoryKey]?.label || hoveredCategoryKey) : 'รายจ่ายรวม'}
+                </div>
+                <div style={{ fontSize: '1.35rem', fontWeight: '800', color: 'var(--text-primary)', margin: '2px 0' }}>
+                  ฿{(hoveredCategoryKey ? periodCatCosts[hoveredCategoryKey] : periodTotal).toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--accent-amber)' }}>
+                  {hoveredCategoryKey 
+                    ? `${((periodCatCosts[hoveredCategoryKey] / (periodTotal || 1)) * 100).toFixed(1)}%`
+                    : '100%'}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side: Category Legend List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', maxHeight: '280px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+              {Object.keys(periodCatCosts)
+                .filter(cat => periodCatCosts[cat] > 0)
+                .sort((a, b) => periodCatCosts[b] - periodCatCosts[a])
+                .map(catKey => {
+                  const cost = periodCatCosts[catKey];
+                  const percent = (cost / (periodTotal || 1)) * 100;
+                  const config = categoriesConfig[catKey] || categoriesConfig.others;
+                  const isHovered = hoveredCategoryKey === catKey;
+
+                  return (
+                    <div 
+                      key={catKey} 
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.45rem 0.75rem',
+                        borderRadius: '8px',
+                        backgroundColor: isHovered ? 'rgba(0,0,0,0.06)' : 'transparent',
+                        border: '1px solid',
+                        borderColor: isHovered ? config.color : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={() => setHoveredCategoryKey(catKey)}
+                      onMouseLeave={() => setHoveredCategoryKey(null)}
+                      onClick={() => {
+                        setSelectedCategoryModal(catKey);
+                        setModalSearchText('');
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span style={{ 
+                          width: '12px', 
+                          height: '12px', 
+                          borderRadius: '50%', 
+                          backgroundColor: config.color,
+                          boxShadow: `0 0 6px ${config.color}66`
+                        }} />
+                        <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+                          {config.label}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                          ฿{cost.toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          ({percent.toFixed(1)}%)
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW: DRILL DOWN CATEGORY DETAIL MODAL */}
+      {selectedCategoryModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}
+        onClick={() => setSelectedCategoryModal(null)}
+        >
+          <div style={{
+            backgroundColor: 'var(--bg-card, #1e293b)',
+            color: 'var(--text-primary, #f8fafc)',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '850px',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid var(--border-card, rgba(255,255,255,0.1))',
+            overflow: 'hidden'
+          }}
+          onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--border-card, rgba(255,255,255,0.1))',
+              display: 'flex',
+              justify: 'space-between',
+              alignItems: 'center',
+              background: 'rgba(0,0,0,0.15)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  backgroundColor: categoriesConfig[selectedCategoryModal]?.color || '#10b981'
+                }} />
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: '700', margin: 0 }}>
+                    รายละเอียดรายการ: {categoriesConfig[selectedCategoryModal]?.label || selectedCategoryModal}
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    ยอดรวมหมวดหมู่นี้: <strong>฿{(periodCatCosts[selectedCategoryModal] || 0).toLocaleString()}</strong>
+                  </span>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setSelectedCategoryModal(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Search Filter inside Modal */}
+            <div style={{ padding: '0.75rem 1.5rem', borderBottom: '1px solid var(--border-card)' }}>
+              <input 
+                type="text" 
+                className="form-control" 
+                placeholder="🔍 พิมพ์ค้นหาชื่อวัตถุดิบ/สินค้า..." 
+                value={modalSearchText}
+                onChange={(e) => setModalSearchText(e.target.value)}
+                style={{ width: '100%', fontSize: '0.85rem', padding: '0.45rem 0.85rem' }}
+              />
+            </div>
+
+            {/* Modal Table Content */}
+            <div style={{ padding: '1rem 1.5rem', overflowY: 'auto', flex: 1 }}>
+              {(() => {
+                const categoryItems = inventory.filter(item => {
+                  const cat = item.category || 'others';
+                  if (cat !== selectedCategoryModal) return false;
+                  if (modalSearchText.trim()) {
+                    return (item.name || '').toLowerCase().includes(modalSearchText.trim().toLowerCase());
+                  }
+                  return true;
+                });
+
+                if (categoryItems.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                      ไม่พบรายการสั่งซื้อ/รับเข้าในหมวดหมู่นี้
+                    </div>
+                  );
+                }
+
+                return (
+                  <table className="table" style={{ width: '100%', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr>
+                        <th>วันที่สั่งซื้อ</th>
+                        <th>ชื่อรายการ / วัตถุดิบ</th>
+                        <th>จำนวน</th>
+                        <th>ยอดเงิน (บาท)</th>
+                        <th>ผู้รับเข้า</th>
+                        <th>หลักฐานบิล</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {categoryItems.map((item, idx) => (
+                        <tr key={item.id || idx}>
+                          <td>{item.date ? new Date(item.date).toLocaleDateString('th-TH') : '-'}</td>
+                          <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{item.name}</td>
+                          <td>{item.quantity ? `${item.quantity} ${item.unit || ''}` : '-'}</td>
+                          <td style={{ fontWeight: '700', color: 'var(--accent-amber)' }}>
+                            {(item.cost || 0).toLocaleString()} ฿
+                          </td>
+                          <td>{item.staff || 'พนักงาน'}</td>
+                          <td>
+                            {item.imageUrl || item.image ? (
+                              <a 
+                                href={item.imageUrl || item.image} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                style={{ color: 'var(--accent-blue)', textDecoration: 'underline', fontSize: '0.75rem' }}
+                              >
+                                🖼️ เปิดดูบิล
+                              </a>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
 
