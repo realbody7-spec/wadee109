@@ -127,11 +127,11 @@ app.get('/api/db/status', (req, res) => {
 app.post('/api/db/config', async (req, res) => {
   const { connectionString, apiKey } = req.body;
   const settings = readData(SETTINGS_FILE, {});
-  settings.supabaseDbUrl = connectionString || '';
-  settings.supabaseApiKey = apiKey || '';
+  if (connectionString !== undefined) settings.supabaseDbUrl = connectionString || '';
+  if (apiKey !== undefined) settings.supabaseApiKey = apiKey || '';
   writeData(SETTINGS_FILE, settings);
   
-  const connected = await initDatabase(connectionString, apiKey);
+  const connected = await initDatabase(settings.supabaseDbUrl, settings.supabaseApiKey);
   res.json({
     success: connected,
     connected,

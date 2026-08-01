@@ -54,7 +54,9 @@ export default function App() {
     googleSheetWebhookUrl: '',
     driveFolderId: '',
     messengerPageAccessToken: '',
-    messengerRecipientId: ''
+    messengerRecipientId: '',
+    supabaseDbUrl: '',
+    supabaseApiKey: ''
   });
   
   const [loading, setLoading] = useState(true);
