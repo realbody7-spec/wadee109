@@ -457,7 +457,8 @@ export default function Integrations({ settings, onSaveSettings }) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     setupSheetTemplate(sheet);
-    return ContentService.createTextOutput("สร้างตารางรายการคอลัมน์บัญชีร้านสำเร็จเรียบร้อยแล้ว! สามารถเปิดดูใน Google Sheet ของคุณได้เลยครับ").setMimeType(ContentService.MimeType.TEXT);
+    recalculateAllMonthlySummaries(sheet);
+    return ContentService.createTextOutput("อัปเดตและจัดขอบเขตสูตรสรุปรายจ่ายประจำเดือนสำเร็จเรียบร้อยแล้ว! สามารถเปิดดูใน Google Sheet ของคุณได้เลยครับ").setMimeType(ContentService.MimeType.TEXT);
   } catch (err) {
     return ContentService.createTextOutput("เกิดข้อผิดพลาด: " + err.toString()).setMimeType(ContentService.MimeType.TEXT);
   }
@@ -738,6 +739,8 @@ function doPost(e) {
       sheet.getRange(nextRow, 1, 1, newRow.length).setValues([newRow]);
     }
     
+    recalculateAllMonthlySummaries(sheet);
+    
     return ContentService.createTextOutput(JSON.stringify({
       success: true, 
       imageUrl: driveFileUrl
@@ -927,6 +930,7 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
 
   // --- การสร้างตารางสรุปด้านข้างสีเขียว (สรุปรายจ่ายประจำเดือน) ---
   var summaryStartCol = colIndex + 4;
+  var dataStartRow = startRow + 3;
   
   function getRangeFormula(startIdx, endIdx) {
     var sCol = 5;
@@ -941,7 +945,11 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
     
     var startLetter = getColumnLetter(sCol);
     var endLetter = getColumnLetter(eCol);
-    return "=SUM(" + startLetter + ":" + endLetter + ")";
+    if (sCol === eCol) {
+      return "=SUM(" + startLetter + dataStartRow + ":" + startLetter + ")";
+    } else {
+      return "=SUM(" + startLetter + dataStartRow + ":" + endLetter + ")";
+    }
   }
   
   var discountLetter = getColumnLetter(colIndex);
@@ -974,7 +982,7 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
     ["แก๊ส / ถ่าน", getRangeFormula(12, 13)],
     ["ค่าน้ำ + ค่าไฟ + เน็ต", getRangeFormula(14, 14)],
     ["การตลาด/ปรับปรุงร้าน", getRangeFormula(15, 15)],
-    ["ส่วนลด", "=SUM(" + discountLetter + ":" + discountLetter + ")"]
+    ["ส่วนลด", "=SUM(" + discountLetter + dataStartRow + ":" + discountLetter + ")"]
   ];
   
   var summaryStartRow = startRow + 3;
@@ -1024,6 +1032,86 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
   sheet.autoResizeColumn(summaryStartCol);
   sheet.autoResizeColumn(summaryStartCol + 1);
   sheet.autoResizeColumn(summaryStartCol + 2);
+  
+  // อัปเดตขอบเขตสูตรของทุกตารางสรุปในแผ่นงานแบบไดนามิกเพื่อไม่ให้ทับซ้อนกัน
+  recalculateAllMonthlySummaries(sheet);
+}
+
+function recalculateAllMonthlySummaries(sheet) {
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 4) return;
+  
+  var values = sheet.getRange("A1:A" + Math.max(lastRow, 100)).getValues();
+  var headerRows = [];
+  for (var i = 0; i < values.length; i++) {
+    var val = (values[i][0] || '').toString();
+    if (val.indexOf('วันที่สั่งซื้อ') === 0) {
+      headerRows.push(i + 1);
+    }
+  }
+  
+  if (headerRows.length === 0) return;
+  
+  for (var h = 0; h < headerRows.length; h++) {
+    var sRow = headerRows[h];
+    var dStart = sRow + 3;
+    var dEnd = (h < headerRows.length - 1) ? (headerRows[h + 1] - 4) : '';
+    
+    var itemCounts = [40, 29, 12, 7, 8, 7, 2, 11, 13, 1, 1, 2, 1, 1, 1, 1, 1, 1];
+    var colIdx = 5;
+    for (var k = 0; k < itemCounts.length; k++) {
+      colIdx += itemCounts[k];
+    }
+    var discCol = colIdx;
+    var sumCol = colIdx + 4;
+    var sumRow = sRow + 3;
+    
+    function buildForm(sIdx, eIdx) {
+      var sc = 5;
+      for (var m = 0; m < sIdx; m++) sc += itemCounts[m];
+      var ec = sc;
+      for (var m = sIdx; m <= eIdx; m++) ec += itemCounts[m];
+      ec = ec - 1;
+      var sL = getColumnLetter(sc);
+      var eL = getColumnLetter(ec);
+      var endStr = dEnd ? dEnd : '';
+      if (sc === ec) {
+        return "=SUM(" + sL + dStart + ":" + sL + endStr + ")";
+      } else {
+        return "=SUM(" + sL + dStart + ":" + eL + endStr + ")";
+      }
+    }
+    
+    var discL = getColumnLetter(discCol);
+    var endStr = dEnd ? dEnd : '';
+    
+    var formulas = [
+      buildForm(0, 0),
+      buildForm(1, 1),
+      buildForm(2, 2),
+      buildForm(3, 3),
+      buildForm(4, 4),
+      buildForm(5, 5),
+      buildForm(6, 6),
+      buildForm(7, 7),
+      buildForm(8, 8),
+      buildForm(9, 9),
+      buildForm(10, 10),
+      buildForm(11, 11),
+      buildForm(12, 13),
+      buildForm(14, 14),
+      buildForm(15, 15),
+      "=SUM(" + discL + dStart + ":" + discL + endStr + ")"
+    ];
+    
+    for (var idx = 0; idx < formulas.length; idx++) {
+      var rNum = sumRow + 1 + idx;
+      try {
+        sheet.getRange(rNum, sumCol + 1).setFormula(formulas[idx]);
+      } catch (e) {}
+    }
+  }
 }
 
 function setupSheetTemplate(sheet) {
