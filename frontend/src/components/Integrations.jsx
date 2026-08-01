@@ -523,10 +523,23 @@ function doPost(e) {
       setupSheetTemplate(sheet);
     }
     
+    var latestHeaderRow = 1;
+    var maxSearchRows = sheet.getLastRow();
+    if (maxSearchRows >= 1) {
+      var colAVals = sheet.getRange(1, 1, Math.max(maxSearchRows, 1), 1).getValues();
+      for (var rIdx = colAVals.length - 1; rIdx >= 0; rIdx--) {
+        var aVal = (colAVals[rIdx][0] || '').toString();
+        if (aVal.indexOf('วันที่สั่งซื้อ') === 0) {
+          latestHeaderRow = rIdx + 1;
+          break;
+        }
+      }
+    }
+    
     var lastCol = sheet.getLastColumn();
-    var headersRow1 = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    var headersRow2 = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
-    var headersRow3 = sheet.getRange(3, 1, 1, lastCol).getValues()[0];
+    var headersRow1 = sheet.getRange(latestHeaderRow, 1, 1, lastCol).getValues()[0];
+    var headersRow2 = sheet.getRange(latestHeaderRow + 1, 1, 1, lastCol).getValues()[0];
+    var headersRow3 = sheet.getRange(latestHeaderRow + 2, 1, 1, lastCol).getValues()[0];
     
     // สร้างอาร์เรย์สรุปชื่อรายการของแต่ละคอลัมน์
     var columns = [];
@@ -1138,6 +1151,20 @@ function repairAllMonthlyHeaders(sheet) {
   if (lastRow < 3) return;
   
   var values = sheet.getRange("A1:A" + Math.max(lastRow, 100)).getValues();
+  var itemCounts = [40, 29, 12, 7, 8, 7, 2, 11, 13, 1, 1, 2, 1, 1, 1, 1, 1, 1];
+  var totalCategoryCols = 0;
+  for (var k = 0; k < itemCounts.length; k++) totalCategoryCols += itemCounts[k];
+  
+  var discCol = 4 + totalCategoryCols; // Column EM
+  var netCol = discCol + 1;            // Column EN
+  var recCol = discCol + 2;            // Column EO
+  var chkCol = discCol + 3;            // Column EP
+  var pcsCol = discCol + 4;            // Column EQ
+  
+  var discL = getColumnLetter(discCol);
+  var netL = getColumnLetter(netCol);
+  var recL = getColumnLetter(recCol);
+  
   for (var i = 0; i < values.length; i++) {
     var val = (values[i][0] || '').toString();
     if (val.indexOf('วันที่สั่งซื้อ') === 0) {
@@ -1147,35 +1174,66 @@ function repairAllMonthlyHeaders(sheet) {
       
       var checkColD_row2 = sheet.getRange(sRow + 1, 4).getValue().toString().trim();
       var checkColD_row1 = sheet.getRange(sRow, 4).getValue().toString().trim();
+      var needsHeaderRebuild = (checkColD_row2 === 'จำนวนชิ้น' || checkColD_row1 === 'จำนวนชิ้น');
       
-      if (checkColD_row2 === 'จำนวนชิ้น' || checkColD_row1 === 'จำนวนชิ้น') {
-        var dStart = sRow + 3;
-        var nextHeaderIndex = -1;
-        for (var j = i + 1; j < values.length; j++) {
-          if ((values[j][0] || '').toString().indexOf('วันที่สั่งซื้อ') === 0) {
-            nextHeaderIndex = j;
-            break;
-          }
+      var dStart = sRow + 3;
+      var nextHeaderIndex = -1;
+      for (var j = i + 1; j < values.length; j++) {
+        if ((values[j][0] || '').toString().indexOf('วันที่สั่งซื้อ') === 0) {
+          nextHeaderIndex = j;
+          break;
         }
-        var dEnd = (nextHeaderIndex !== -1) ? (nextHeaderIndex) : sheet.getLastRow();
-        
-        if (dEnd >= dStart) {
-          for (var r = dStart; r <= dEnd; r++) {
-            try {
+      }
+      var dEnd = (nextHeaderIndex !== -1) ? (nextHeaderIndex) : sheet.getLastRow();
+      
+      if (dEnd >= dStart) {
+        for (var r = dStart; r <= dEnd; r++) {
+          try {
+            var dateVal = sheet.getRange(r, 1).getValue();
+            if (!dateVal) continue;
+            
+            if (needsHeaderRebuild) {
               var rowVals = sheet.getRange(r, 4, 1, sheet.getLastColumn() - 3).getValues()[0];
               if ((rowVals[0] === '' || rowVals[0] === null) && rowVals[1] !== '' && rowVals[1] !== null) {
                 rowVals.shift();
                 rowVals.push('');
                 sheet.getRange(r, 4, 1, rowVals.length).setValues([rowVals]);
               }
-            } catch(e) {}
-          }
+            }
+            
+            var costVal = sheet.getRange(r, 2).getValue() || 0;
+            var discVal = sheet.getRange(r, discCol).getValue();
+            var recVal = sheet.getRange(r, recCol).getValue();
+            
+            // ถ้าช่องส่วนลดถูกใส่เป็นค่ายอดรวม (เช่น 1698.00) ให้แก้กลับเป็น 0
+            if (discVal === costVal || typeof discVal === 'string') {
+              sheet.getRange(r, discCol).setValue(0);
+            }
+            
+            // ใส่สูตรราคาสุทธิ =B[r]-EM[r]
+            sheet.getRange(r, netCol).setFormula("=B" + r + "-" + discL + r);
+            
+            // ถ้ารับเงินแล้วเป็น TRUE ให้ปรับเป็นค่ายอดเงินสุทธิ
+            if (recVal === true || recVal === false || typeof recVal === 'boolean') {
+              sheet.getRange(r, recCol).setValue((costVal || 0) - (sheet.getRange(r, discCol).getValue() || 0));
+            }
+            
+            // ใส่สูตรตรวจสอบ =EO[r]=EN[r]
+            sheet.getRange(r, chkCol).setFormula("=" + recL + r + "=" + netL + r);
+            
+            // ถ้าช่องจำนวนชิ้นมีข้อความ (เช่น 'ผัก') ให้ล้างออก
+            var pcsVal = sheet.getRange(r, pcsCol).getValue();
+            if (typeof pcsVal === 'string' && pcsVal !== '') {
+              sheet.getRange(r, pcsCol).setValue('');
+            }
+          } catch(e) {}
         }
-        
+      }
+      
+      if (needsHeaderRebuild) {
         try {
           sheet.getRange(sRow, 1, 3, sheet.getLastColumn()).breakApart();
         } catch (e) {}
-        
         createMonthlyHeaderBlock(sheet, sRow, monthStr);
       }
     }
