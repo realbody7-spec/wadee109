@@ -786,9 +786,9 @@ function getThaiMonthYear() {
 }
 
 function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
-  var row1 = ['วันที่สั่งซื้อ (' + monthStr + ')', 'ยอดรวมบิล', 'จำนวน', 'จำนวนชิ้น'];
-  var row2 = ['', '', '', ''];
-  var row3 = ['', '', '', ''];
+  var row1 = ['วันที่สั่งซื้อ (' + monthStr + ')', 'ยอดรวมบิล', 'จำนวน'];
+  var row2 = ['', '', ''];
+  var row3 = ['', '', ''];
   
   var schema = [
     { category: 'เครื่องครัว/ของแห้ง', color: '#d9e1f2', items: ['น้ำตาลปี๊บ', 'น้ำตาลทราย', 'งาขาว', 'ชูรส', 'น้ำปลา', 'น้ำส้มสายชู', 'น้ำปลาร้า', 'น้ำมัน', 'น้ำมันงา', 'ซอสมะเขือ', 'ซอสพริก', 'มายองเนส', 'น้ำจิ้มบ๊วย', 'ซอสสูตร5', 'ซอสหอยนางรม', 'ซีอิ๊วฉลากแดง', 'ซีอิ๊วขาว สูตร1', 'ซอสฝาเขียว', 'เบกกิ้งโซดา', 'ไวไว', 'มาม่า', 'หมี่หยก', 'วุ้นเส้น', 'ข้าวสาร', 'ข้าวคั่ว', 'ผงมะนาว', 'กระเทียมดอง', 'น้ำมะขาม', 'พริกป่น', 'โชยุ', 'วาซาบิ', 'เกลือ', 'น้ำยาล้างจาน', 'ผงซักฟอก', 'ถุงขยะ 18*20', 'ถุงหิ้ว 12*26', 'ถุงร้อน 8*12', 'ถุงหิ้ว 8*16', 'ไข่ไก่', 'เต้าหู้ไข่'] },
@@ -811,11 +811,11 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
     { category: 'ภาพถ่ายบิล', color: '#ffffff', items: ['รูปภาพบิล'] }
   ];
   
-  var colIndex = 5;
+  var colIndex = 4;
   var mergeRangesRow2 = [];
   var verticalMergeCols = [];
   
-  var cogsEndCol = 4;
+  var cogsEndCol = 3;
   for (var i = 0; i <= 8; i++) {
     cogsEndCol += schema[i].items.length;
   }
@@ -850,9 +850,10 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
     colIndex += numItems;
   }
   
-  row1.push('ส่วนลด', 'ราคาสุทธิ', 'รับเงินแล้ว', 'ตรวจสอบ');
-  row2.push('', '', '', '');
-  row3.push('', '', '', '');
+  // คอลัมน์ระบบและคอลัมน์จำนวนชิ้นไว้หลังสุด
+  row1.push('ส่วนลด', 'ราคาสุทธิ', 'รับเงินแล้ว', 'ตรวจสอบ', 'จำนวนชิ้น');
+  row2.push('', '', '', '', '');
+  row3.push('', '', '', '', '');
   
   var totalCols = row1.length;
   var maxRows = sheet.getMaxRows();
@@ -864,15 +865,15 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
   sheet.getRange(startRow + 1, 1, 1, totalCols).setValues([row2]);
   sheet.getRange(startRow + 2, 1, 1, totalCols).setValues([row3]);
   
-  for (var c = 1; c <= 4; c++) {
+  for (var c = 1; c <= 3; c++) {
     sheet.getRange(startRow, c, 3, 1).merge();
   }
   
-  for (var c = colIndex; c < colIndex + 4; c++) {
+  for (var c = colIndex; c < colIndex + 5; c++) {
     sheet.getRange(startRow, c, 3, 1).merge();
   }
   
-  var cogsRange = sheet.getRange(startRow, 5, 1, cogsEndCol - 5 + 1);
+  var cogsRange = sheet.getRange(startRow, 4, 1, cogsEndCol - 4 + 1);
   cogsRange.merge();
   cogsRange.setBackground('#00ff00');
   
@@ -905,6 +906,7 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
   sheet.getRange(startRow, colIndex + 1, 3, 1).setBackground("#00ffff");
   sheet.getRange(startRow, colIndex + 2, 3, 1).setBackground("#f2f2f2");
   sheet.getRange(startRow, colIndex + 3, 3, 1).setBackground("#f2f2f2");
+  sheet.getRange(startRow, colIndex + 4, 3, 1).setBackground("#e6ebd5");
   
   sheet.setRowHeight(startRow, 30);
   sheet.setRowHeight(startRow + 1, 35);
@@ -929,11 +931,11 @@ function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
   }
 
   // --- การสร้างตารางสรุปด้านข้างสีเขียว (สรุปรายจ่ายประจำเดือน) ---
-  var summaryStartCol = colIndex + 4;
+  var summaryStartCol = colIndex + 5;
   var dataStartRow = startRow + 3;
   
   function getRangeFormula(startIdx, endIdx) {
-    var sCol = 5;
+    var sCol = 4;
     for (var i = 0; i < startIdx; i++) {
       sCol += schema[i].items.length;
     }
@@ -1059,16 +1061,16 @@ function recalculateAllMonthlySummaries(sheet) {
     var dEnd = (h < headerRows.length - 1) ? (headerRows[h + 1] - 4) : '';
     
     var itemCounts = [40, 29, 12, 7, 8, 7, 2, 11, 13, 1, 1, 2, 1, 1, 1, 1, 1, 1];
-    var colIdx = 5;
+    var colIdx = 4;
     for (var k = 0; k < itemCounts.length; k++) {
       colIdx += itemCounts[k];
     }
     var discCol = colIdx;
-    var sumCol = colIdx + 4;
+    var sumCol = colIdx + 5;
     var sumRow = sRow + 3;
     
     function buildForm(sIdx, eIdx) {
-      var sc = 5;
+      var sc = 4;
       for (var m = 0; m < sIdx; m++) sc += itemCounts[m];
       var ec = sc;
       for (var m = sIdx; m <= eIdx; m++) ec += itemCounts[m];
