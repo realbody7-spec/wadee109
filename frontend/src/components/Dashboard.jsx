@@ -87,6 +87,58 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
 
   const activeLabels = chartType === 'daily' ? dailyLabels : monthlyLabels;
 
+  // Helper to normalize English or raw category strings into standard Thai category keys
+  const normalizeCategory = (item) => {
+    if (!item) return 'others';
+    const rawCat = (item.category || '').toString().trim();
+    const rawCatLower = rawCat.toLowerCase();
+    const itemName = (item.name || '').toString().trim().toLowerCase();
+
+    // 1. Exact match with configured Thai categories
+    if (categoriesConfig[rawCat]) return rawCat;
+
+    // 2. English / Alias mappings
+    if (rawCatLower === 'meat') return 'เนื้อหมู / ไก่';
+    if (rawCatLower === 'seafood') return 'ทะเล';
+    if (rawCatLower === 'vegetables' || rawCatLower === 'vegetable' || rawCatLower === 'veg') return 'ผัก';
+    if (rawCatLower === 'dairy' || rawCatLower === 'dry' || rawCatLower === 'groceries') return 'เครื่องครัว/ของแห้ง';
+    if (rawCatLower === 'beef') return 'เนื้อวัว';
+    if (rawCatLower === 'beverage' || rawCatLower === 'drink' || rawCatLower === 'drinks') return 'เครื่องดื่ม';
+    if (rawCatLower === 'fried' || rawCatLower === 'snack') return 'ของทอด';
+    if (rawCatLower === 'sauce') return 'น้ำจิ้ม';
+    if (rawCatLower === 'asset') return 'Asset';
+    if (rawCatLower === 'salary' || rawCatLower === 'rent') return 'เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน';
+    if (rawCatLower === 'utility' || rawCatLower === 'utilities') return 'ค่าน้ำ + ค่าไฟ + เน็ต';
+
+    // 3. Keyword matching from Item Name
+    if (itemName.includes('หมู') || itemName.includes('ไก่') || itemName.includes('ตับ') || itemName.includes('เบคอน') || itemName.includes('สันคอ') || itemName.includes('สามชั้น') || itemName.includes('ปีก')) {
+      return 'เนื้อหมู / ไก่';
+    }
+    if (itemName.includes('วัว') || itemName.includes('เนื้อออส') || itemName.includes('ริบอาย') || itemName.includes('เสือ') || itemName.includes('สันใน')) {
+      return 'เนื้อวัว';
+    }
+    if (itemName.includes('กุ้ง') || itemName.includes('หมึก') || itemName.includes('ปู') || itemName.includes('ปลา') || itemName.includes('แซลมอน') || itemName.includes('ทะเล') || itemName.includes('กะพรุน')) {
+      return 'ทะเล';
+    }
+    if (itemName.includes('ผัก') || itemName.includes('กะหล่ำ') || itemName.includes('เห็ด') || itemName.includes('แครอท') || itemName.includes('มะเขือ') || itemName.includes('หอม') || itemName.includes('กระเทียม') || itemName.includes('มะนาว') || itemName.includes('บล็อคโคลี่') || itemName.includes('ตั้งโอ๋')) {
+      return 'ผัก';
+    }
+    if (itemName.includes('ซอส') || itemName.includes('น้ำจิ้ม') || itemName.includes('โชยุ') || itemName.includes('วาซาบิ') || itemName.includes('bbq')) {
+      return 'น้ำจิ้ม';
+    }
+    if (itemName.includes('น้ำเปล่า') || itemName.includes('โซดา') || itemName.includes('เบียร์') || itemName.includes('เครื่องดื่ม') || itemName.includes('ไอติม') || itemName.includes('หลอด') || itemName.includes('น้ำอัดลม')) {
+      return 'เครื่องดื่ม';
+    }
+    if (itemName.includes('ทอด') || itemName.includes('เฟรนฟราย') || itemName.includes('นักเก็ต') || itemName.includes('เกี๊ยวซ่า')) {
+      return 'ของทอด';
+    }
+    if (itemName.includes('น้ำตาล') || itemName.includes('เนย') || itemName.includes('น้ำปลา') || itemName.includes('เกลือ') || itemName.includes('ชูรส') || itemName.includes('ไข่') || itemName.includes('ข้าว') || itemName.includes('ถุง') || itemName.includes('แป้ง') || itemName.includes('ซีอิ๊ว')) {
+      return 'เครื่องครัว/ของแห้ง';
+    }
+
+    return rawCat || 'others';
+  };
+
   // Process data from local inward logs (inventory)
   const chartData = activeLabels.map(label => {
     const labelItems = inventory.filter(item => {
@@ -101,10 +153,10 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
 
     const total = labelItems.reduce((sum, item) => sum + (item.cost || 0), 0);
     
-    // Group costs by category
+    // Group costs by category using normalizeCategory
     const breakdown = {};
     labelItems.forEach(item => {
-      const cat = item.category || 'others';
+      const cat = normalizeCategory(item);
       breakdown[cat] = (breakdown[cat] || 0) + (item.cost || 0);
     });
 
@@ -823,7 +875,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
             <div style={{ padding: '1rem 1.5rem', overflowY: 'auto', flex: 1 }}>
               {(() => {
                 const categoryItems = inventory.filter(item => {
-                  const cat = item.category || 'others';
+                  const cat = normalizeCategory(item);
                   if (cat !== selectedCategoryModal) return false;
                   if (modalSearchText.trim()) {
                     return (item.name || '').toLowerCase().includes(modalSearchText.trim().toLowerCase());
