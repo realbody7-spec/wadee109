@@ -71,7 +71,8 @@ export async function initDatabase(connectionString, keyInput) {
   // Option 2: Supabase API URL + API Key
   if (dbUrl.startsWith('https://') && apiKey) {
     try {
-      supabaseClient = createClient(dbUrl, apiKey);
+      const cleanUrl = dbUrl.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
+      supabaseClient = createClient(cleanUrl, apiKey);
       const { data, error } = await supabaseClient.from('inventory').select('id').limit(1);
       if (!error) {
         console.log('✅ Connected to Supabase via Supabase JS Client successfully!');
