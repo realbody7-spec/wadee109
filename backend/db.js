@@ -43,7 +43,7 @@ export async function initDatabase(connectionString, keyInput) {
     console.log('ℹ️ No DATABASE_URL provided. Running with Local JSON storage.');
     isConnected = false;
     dbMode = 'json';
-    return false;
+    return { success: false, message: 'กรุณากรอก Connection String หรือ Supabase Project URL' };
   }
 
   // Option 1: Direct / Pooler PostgreSQL Connection String
@@ -62,34 +62,61 @@ export async function initDatabase(connectionString, keyInput) {
 
       await createTables();
       await autoMigrateLocalData();
-      return true;
+      return { success: true, message: 'เชื่อมต่อ Supabase / PostgreSQL เรียบร้อยแล้ว!' };
     } catch (err) {
       console.error('⚠️ Could not connect via PostgreSQL URI:', err.message);
+      isConnected = false;
+      dbMode = 'json';
+      return { success: false, message: `ไม่สามารถเชื่อมต่อ PostgreSQL ได้: ${err.message}` };
     }
   }
 
   // Option 2: Supabase API URL + API Key
-  if (dbUrl.startsWith('https://') && apiKey) {
+  if (dbUrl.startsWith('https://')) {
     try {
       const cleanUrl = dbUrl.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
-      supabaseClient = createClient(cleanUrl, apiKey);
-      const { data, error } = await supabaseClient.from('inventory').select('id').limit(1);
-      if (!error) {
+      if (!apiKey) {
+        return { success: false, message: 'กรุณากรอก Supabase API Key (Publishable Key หรือ anon/service key)' };
+      }
+
+      // Direct REST Endpoint Test
+      const testRes = await fetch(`${cleanUrl}/rest/v1/`, {
+        method: 'GET',
+        headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}` }
+      });
+
+      if (testRes.status === 200 || testRes.status === 204) {
+        supabaseClient = createClient(cleanUrl, apiKey);
         console.log('✅ Connected to Supabase via Supabase JS Client successfully!');
         isConnected = true;
         dbMode = 'supabase_js';
-        return true;
+        return { success: true, message: 'เชื่อมต่อ Supabase API สำเร็จเรียบร้อยแล้ว!' };
+      } else if (testRes.status === 401 || testRes.status === 403) {
+        isConnected = false;
+        dbMode = 'json';
+        return { 
+          success: false, 
+          message: 'Project URL ถูกต้อง แต่ Supabase API Key ไม่ถูกต้อง หรือรหัสผ่านไม่ผ่าน (HTTP 401 Unauthorized)' 
+        };
       } else {
-        console.error('⚠️ Supabase JS Client test query failed:', error.message);
+        isConnected = false;
+        dbMode = 'json';
+        return { 
+          success: false, 
+          message: `ตอบกลับจาก Supabase ล้มเหลว (HTTP Status: ${testRes.status})` 
+        };
       }
     } catch (err) {
       console.error('⚠️ Could not connect via Supabase JS Client:', err.message);
+      isConnected = false;
+      dbMode = 'json';
+      return { success: false, message: `เกิดข้อผิดพลาดในการเชื่อมต่อ: ${err.message}` };
     }
   }
 
   isConnected = false;
   dbMode = 'json';
-  return false;
+  return { success: false, message: 'รูปแบบ URL ไม่ถูกต้อง ต้องขึ้นต้นด้วย postgresql:// หรือ https://' };
 }
 
 async function createTables() {
