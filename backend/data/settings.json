@@ -7,5 +7,7 @@
   "googleSheetWebhookUrl": "https://script.google.com/macros/s/AKfycbx2OAK9mgT2LYsTMXgoBfY4rZTGUGnh5eLV-S4lT9celu_I2hV-BUXajznuMtZXitqw/exec",
   "driveFolderId": "1UO7Y1vTF4OQJwHpajbXfBkJ0f0-fjXV1",
   "messengerPageAccessToken": "",
-  "messengerRecipientId": ""
+  "messengerRecipientId": "",
+  "supabaseDbUrl": "",
+  "supabaseApiKey": ""
 }

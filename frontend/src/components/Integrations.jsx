@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Send, CheckCircle, XCircle, AlertTriangle, ShieldCheck, HelpCircle } from 'lucide-react';
 
 export default function Integrations({ settings, onSaveSettings }) {
-  const [simulationMode, setSimulationMode] = useState(settings.simulationMode);
+  const [simulationMode, setSimulationMode] = useState(settings.simulationMode ?? true);
   
   // Line Notify States
   const [lineNotifyToken, setLineNotifyToken] = useState(settings.lineNotifyToken || '');
@@ -34,6 +34,23 @@ export default function Integrations({ settings, onSaveSettings }) {
   const [testDbStatus, setTestDbStatus] = useState(null);
   const [isTestingDb, setIsTestingDb] = useState(false);
 
+  // Synchronize state when settings prop changes (e.g. after fetch backend response)
+  useEffect(() => {
+    if (settings) {
+      if (settings.simulationMode !== undefined) setSimulationMode(settings.simulationMode);
+      if (settings.lineNotifyToken !== undefined) setLineNotifyToken(settings.lineNotifyToken || '');
+      if (settings.lineChannelAccessToken !== undefined) setLineChannelAccessToken(settings.lineChannelAccessToken || '');
+      if (settings.lineUserId !== undefined) setLineUserId(settings.lineUserId || '');
+      if (settings.lineChannelSecret !== undefined) setLineChannelSecret(settings.lineChannelSecret || '');
+      if (settings.googleSheetWebhookUrl !== undefined) setGoogleSheetWebhookUrl(settings.googleSheetWebhookUrl || '');
+      if (settings.driveFolderId !== undefined) setDriveFolderId(settings.driveFolderId || '');
+      if (settings.messengerPageAccessToken !== undefined) setMessengerPageAccessToken(settings.messengerPageAccessToken || '');
+      if (settings.messengerRecipientId !== undefined) setMessengerRecipientId(settings.messengerRecipientId || '');
+      if (settings.supabaseDbUrl !== undefined) setSupabaseDbUrl(settings.supabaseDbUrl || '');
+      if (settings.supabaseApiKey !== undefined) setSupabaseApiKey(settings.supabaseApiKey || '');
+    }
+  }, [settings]);
+
   const testAndConnectDb = async () => {
     if (!supabaseDbUrl) {
       alert('กรุณากรอก Connection String หรือ Supabase Project URL ก่อนทดสอบ');
@@ -52,6 +69,21 @@ export default function Integrations({ settings, onSaveSettings }) {
       });
       const data = await response.json();
       setTestDbStatus({ success: data.success, msg: data.message });
+      if (data.success) {
+        onSaveSettings({
+          simulationMode,
+          lineNotifyToken,
+          lineChannelAccessToken,
+          lineUserId,
+          lineChannelSecret,
+          googleSheetWebhookUrl,
+          driveFolderId,
+          messengerPageAccessToken,
+          messengerRecipientId,
+          supabaseDbUrl,
+          supabaseApiKey
+        }, true);
+      }
     } catch (err) {
       setTestDbStatus({ success: false, msg: 'ไม่สามารถทดสอบการเชื่อมต่อได้' });
     } finally {
@@ -60,7 +92,7 @@ export default function Integrations({ settings, onSaveSettings }) {
   };
 
   const handleSaveAll = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     onSaveSettings({
       simulationMode,
       lineNotifyToken,
@@ -89,7 +121,9 @@ export default function Integrations({ settings, onSaveSettings }) {
       googleSheetWebhookUrl,
       driveFolderId,
       messengerPageAccessToken,
-      messengerRecipientId
+      messengerRecipientId,
+      supabaseDbUrl,
+      supabaseApiKey
     }, true); // Silent update
   };
 
