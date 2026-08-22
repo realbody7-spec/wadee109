@@ -224,14 +224,14 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
           
           {/* Main Grid View */}
           {bottomNav === 'menu' && (
-            <div className="flex-1 grid grid-cols-5 gap-2 overflow-y-auto pr-1 align-content-start">
+            <div className="flex-1 grid grid-cols-5 pos-grid-5 gap-2 overflow-y-auto pr-1 align-content-start">
               {filteredMenu.map(item => {
                 const cartQty = cart.find(c => c.id === item.id)?.qty || 0;
                 return (
                   <div
                     key={item.id}
                     onClick={() => addToCart(item)}
-                    className="bg-white rounded border border-slate-300 shadow-2xs hover:shadow hover:border-slate-400 cursor-pointer flex flex-col justify-between active:scale-95 transition-transform overflow-hidden h-[115px] relative"
+                    className="pos-card-item bg-white rounded border border-slate-300 shadow-2xs hover:shadow hover:border-slate-400 cursor-pointer flex flex-col justify-between active:scale-95 transition-transform overflow-hidden h-[115px] relative"
                   >
                     {cartQty > 0 && (
                       <div className="absolute top-1 left-1 bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full z-10">

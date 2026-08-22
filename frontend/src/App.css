@@ -59,6 +59,26 @@ body {
   overflow-x: hidden;
 }
 
+/* POS Specific Layout Fallbacks */
+.pos-grid-5 {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 0.5rem !important;
+}
+
+.pos-card-item {
+  height: 115px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+}
+
+.pos-card-item img {
+  width: 100% !important;
+  height: 72px !important;
+  object-fit: cover !important;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
