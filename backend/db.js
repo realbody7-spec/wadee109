@@ -403,3 +403,344 @@ export async function saveUsers(users) {
   }
   return users;
 }
+
+// --- POS (Point of Sale) Operations ---
+
+const DEFAULT_POS_MENU = [
+  {
+    id: 'pos-m-1',
+    name: 'ผัดไทยกุ้งสด',
+    category: 'main',
+    price: 129,
+    image: 'https://images.unsplash.com/photo-1559847844-5315695dadae?w=400&auto=format&fit=crop',
+    description: 'ผัดไทยเส้นจันทน์ เหนียวนุ่ม กุ้งแม่น้ำสดๆ',
+    ingredients: [
+      { inventoryName: 'กุ้งสด', amount: 0.1, unit: 'kg' },
+      { inventoryName: 'เส้นจันทน์', amount: 0.15, unit: 'kg' }
+    ]
+  },
+  {
+    id: 'pos-m-2',
+    name: 'ข้าวผัดกะเพราเนื้อไข่ดาว',
+    category: 'main',
+    price: 89,
+    image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=400&auto=format&fit=crop',
+    description: 'เนื้อสับผัดกะเพราหอมกรุ่น รสจัดจ้าน เสิร์ฟพร้อมไข่ดาวกรอบ',
+    ingredients: [
+      { inventoryName: 'เนื้อสับ', amount: 0.12, unit: 'kg' },
+      { inventoryName: 'ไข่ไก่', amount: 1, unit: 'pieces' }
+    ]
+  },
+  {
+    id: 'pos-m-3',
+    name: 'ข้าวมันไก่ตอน',
+    category: 'main',
+    price: 79,
+    image: 'https://images.unsplash.com/photo-1626804475297-41608e074eb1?w=400&auto=format&fit=crop',
+    description: 'ไก่ตอนเนื้อนุ่ม ข้าวมันหอมละมุน เสิร์ฟพร้อมน้ำจิ้มสูตรเด็ด',
+    ingredients: [
+      { inventoryName: 'เนื้อไก่', amount: 0.15, unit: 'kg' },
+      { inventoryName: 'ข้าวสาร', amount: 0.1, unit: 'kg' }
+    ]
+  },
+  {
+    id: 'pos-m-4',
+    name: 'ต้มยำกุ้งแม่น้ำ (หม้อไฟ)',
+    category: 'soup',
+    price: 199,
+    image: 'https://images.unsplash.com/photo-1548946526-f69e2424cf45?w=400&auto=format&fit=crop',
+    description: 'ต้มยำกุ้งน้ำข้น เข้มข้นถึงเครื่องต้มยำแท้',
+    ingredients: [
+      { inventoryName: 'กุ้งสด', amount: 0.2, unit: 'kg' },
+      { inventoryName: 'เห็ดฟาง', amount: 0.1, unit: 'kg' }
+    ]
+  },
+  {
+    id: 'pos-m-5',
+    name: 'แกงเขียวหวานไก่ + โรตี',
+    category: 'soup',
+    price: 149,
+    image: 'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=400&auto=format&fit=crop',
+    description: 'แกงเขียวหวานรสเข้มข้น ทานคู่แป้งโรตีกรอบนอกนุ่มใน',
+    ingredients: [
+      { inventoryName: 'เนื้อไก่', amount: 0.15, unit: 'kg' }
+    ]
+  },
+  {
+    id: 'pos-m-6',
+    name: 'ส้มตำไทยไข่เค็ม',
+    category: 'appetizer',
+    price: 75,
+    image: 'https://images.unsplash.com/photo-1569058242567-93de6f36f8e6?w=400&auto=format&fit=crop',
+    description: 'ส้มตำมะละกอกรอบ รสแซ่บครบรส โรยไข่เค็มและกุ้งแห้ง',
+    ingredients: [
+      { inventoryName: 'มะละกอ', amount: 0.2, unit: 'kg' }
+    ]
+  },
+  {
+    id: 'pos-m-7',
+    name: 'ไก่ทอดหาดใหญ่',
+    category: 'appetizer',
+    price: 95,
+    image: 'https://images.unsplash.com/photo-1562967914-608f82629710?w=400&auto=format&fit=crop',
+    description: 'ไก่ทอดหมักเครื่องเทศหอมๆ ทอดกรอบ โรยหอมเจียวจัดเต็ม',
+    ingredients: [
+      { inventoryName: 'เนื้อไก่', amount: 0.2, unit: 'kg' }
+    ]
+  },
+  {
+    id: 'pos-m-8',
+    name: 'ชาไทยเย็น (Thai Iced Tea)',
+    category: 'beverage',
+    price: 45,
+    image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=400&auto=format&fit=crop',
+    description: 'ชาไทยพรีเมียม หอมเข้มข้น หวานมันกำลังดี',
+    ingredients: [
+      { inventoryName: 'ชาไทย', amount: 0.02, unit: 'kg' },
+      { inventoryName: 'นมข้นหวาน', amount: 0.03, unit: 'kg' }
+    ]
+  },
+  {
+    id: 'pos-m-9',
+    name: 'กาแฟโบราณเย็น',
+    category: 'beverage',
+    price: 45,
+    image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=400&auto=format&fit=crop',
+    description: 'กาแฟโบราณเข้มข้น หอมหวานมัน เข้มสะใจ',
+    ingredients: []
+  },
+  {
+    id: 'pos-m-10',
+    name: 'น้ำมะพร้าวสดแท้ 100%',
+    category: 'beverage',
+    price: 55,
+    image: 'https://images.unsplash.com/photo-1525385133512-2f3bdd039054?w=400&auto=format&fit=crop',
+    description: 'น้ำมะพร้าวลูกสดๆ หวานธรรมชาติ ชื่นใจ',
+    ingredients: []
+  },
+  {
+    id: 'pos-m-11',
+    name: 'ข้าวเหนียวมะม่วง',
+    category: 'dessert',
+    price: 99,
+    image: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=400&auto=format&fit=crop',
+    description: 'มะม่วงน้ำดอกไม้หวานฉ่ำ ข้าวเหนียวมูนกะทิหอมหวาน',
+    ingredients: []
+  },
+  {
+    id: 'pos-m-12',
+    name: 'บัวลอยเผือกมะพร้าวอ่อน',
+    category: 'dessert',
+    price: 55,
+    image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&auto=format&fit=crop',
+    description: 'บัวลอยเม็ดนุ่ม เผือกหอม พร้อมเนื้อมะพร้าวอ่อนในกะทิสด',
+    ingredients: []
+  }
+];
+
+const DEFAULT_POS_TABLES = [
+  { id: 'T01', name: 'โต๊ะ 01', capacity: 2, status: 'available', orderId: null },
+  { id: 'T02', name: 'โต๊ะ 02', capacity: 2, status: 'available', orderId: null },
+  { id: 'T03', name: 'โต๊ะ 03', capacity: 4, status: 'available', orderId: null },
+  { id: 'T04', name: 'โต๊ะ 04', capacity: 4, status: 'available', orderId: null },
+  { id: 'T05', name: 'โต๊ะ 05', capacity: 6, status: 'available', orderId: null },
+  { id: 'T06', name: 'โต๊ะ 06', capacity: 6, status: 'available', orderId: null },
+  { id: 'T07', name: 'โต๊ะ 07 (ระเบียง)', capacity: 4, status: 'available', orderId: null },
+  { id: 'T08', name: 'โต๊ะ 08 (ระเบียง)', capacity: 4, status: 'available', orderId: null },
+  { id: 'VIP1', name: 'ห้อง VIP 1', capacity: 10, status: 'available', orderId: null },
+  { id: 'VIP2', name: 'ห้อง VIP 2', capacity: 12, status: 'available', orderId: null }
+];
+
+export async function getPosMenuItems() {
+  const data = getLocalData('pos_menu.json', null);
+  if (!data || data.length === 0) {
+    saveLocalData('pos_menu.json', DEFAULT_POS_MENU);
+    return DEFAULT_POS_MENU;
+  }
+  return data;
+}
+
+export async function addPosMenuItem(item) {
+  const menu = await getPosMenuItems();
+  const newItem = {
+    id: item.id || `pos-m-${Date.now()}`,
+    name: item.name,
+    category: item.category || 'main',
+    price: parseFloat(item.price) || 0,
+    image: item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop',
+    description: item.description || '',
+    ingredients: item.ingredients || []
+  };
+  menu.push(newItem);
+  saveLocalData('pos_menu.json', menu);
+  return newItem;
+}
+
+export async function updatePosMenuItem(id, updated) {
+  const menu = await getPosMenuItems();
+  const idx = menu.findIndex(m => m.id === id);
+  if (idx !== -1) {
+    menu[idx] = { ...menu[idx], ...updated };
+    saveLocalData('pos_menu.json', menu);
+    return menu[idx];
+  }
+  return null;
+}
+
+export async function deletePosMenuItem(id) {
+  const menu = await getPosMenuItems();
+  const filtered = menu.filter(m => m.id !== id);
+  saveLocalData('pos_menu.json', filtered);
+  return true;
+}
+
+export async function getPosTables() {
+  const data = getLocalData('pos_tables.json', null);
+  if (!data || data.length === 0) {
+    saveLocalData('pos_tables.json', DEFAULT_POS_TABLES);
+    return DEFAULT_POS_TABLES;
+  }
+  return data;
+}
+
+export async function updatePosTable(id, status, orderId = null) {
+  const tables = await getPosTables();
+  const idx = tables.findIndex(t => t.id === id);
+  if (idx !== -1) {
+    tables[idx].status = status;
+    tables[idx].orderId = orderId;
+    saveLocalData('pos_tables.json', tables);
+    return tables[idx];
+  }
+  return null;
+}
+
+export async function getPosOrders() {
+  return getLocalData('pos_orders.json', []);
+}
+
+export async function addPosOrder(orderData) {
+  const orders = await getPosOrders();
+
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0,10).replace(/-/g, '');
+  const dailyCount = orders.filter(o => o.createdAt && o.createdAt.startsWith(now.toISOString().slice(0,10))).length + 1;
+  const orderNo = `POS-${dateStr}-${String(dailyCount).padStart(3, '0')}`;
+
+  const newOrder = {
+    id: `ord-${Date.now()}`,
+    orderNo,
+    tableId: orderData.tableId || 'Takeaway',
+    tableName: orderData.tableName || 'สั่งกลับบ้าน',
+    orderType: orderData.orderType || 'dine-in', // 'dine-in' | 'takeaway' | 'delivery'
+    status: orderData.status || 'pending', // 'pending' | 'cooking' | 'served' | 'paid' | 'cancelled'
+    items: orderData.items || [], // [{ id, name, price, qty, notes }]
+    subtotal: parseFloat(orderData.subtotal) || 0,
+    discount: parseFloat(orderData.discount) || 0,
+    serviceCharge: parseFloat(orderData.serviceCharge) || 0,
+    vat: parseFloat(orderData.vat) || 0,
+    total: parseFloat(orderData.total) || 0,
+    paymentMethod: orderData.paymentMethod || null, // 'cash' | 'promptpay' | 'credit'
+    receivedAmount: parseFloat(orderData.receivedAmount) || 0,
+    changeAmount: parseFloat(orderData.changeAmount) || 0,
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    staffName: orderData.staffName || 'Staff'
+  };
+
+  orders.unshift(newOrder);
+  saveLocalData('pos_orders.json', orders);
+
+  // Update table status if dine-in
+  if (newOrder.tableId && newOrder.tableId !== 'Takeaway' && newOrder.tableId !== 'Delivery') {
+    await updatePosTable(newOrder.tableId, 'occupied', newOrder.id);
+  }
+
+  return newOrder;
+}
+
+export async function updatePosOrder(id, updateData) {
+  const orders = await getPosOrders();
+  const idx = orders.findIndex(o => o.id === id);
+  if (idx !== -1) {
+    orders[idx] = { ...orders[idx], ...updateData, updatedAt: new Date().toISOString() };
+    saveLocalData('pos_orders.json', orders);
+    return orders[idx];
+  }
+  return null;
+}
+
+export async function payPosOrder(id, paymentInfo) {
+  const orders = await getPosOrders();
+  const idx = orders.findIndex(o => o.id === id);
+  if (idx === -1) return null;
+
+  const order = orders[idx];
+  order.status = 'paid';
+  order.paymentMethod = paymentInfo.paymentMethod || 'cash';
+  order.receivedAmount = parseFloat(paymentInfo.receivedAmount) || order.total;
+  order.changeAmount = Math.max(0, order.receivedAmount - order.total);
+  order.paidAt = new Date().toISOString();
+  order.updatedAt = new Date().toISOString();
+
+  saveLocalData('pos_orders.json', orders);
+
+  // Free table if dine-in
+  if (order.tableId && order.tableId !== 'Takeaway' && order.tableId !== 'Delivery') {
+    await updatePosTable(order.tableId, 'available', null);
+  }
+
+  // --- Automatic Inventory Deduction ---
+  try {
+    const inventory = await getInventoryItems();
+    const posMenuItems = await getPosMenuItems();
+    let inventoryChanged = false;
+
+    for (const orderItem of order.items) {
+      const menuItem = posMenuItems.find(m => m.id === orderItem.id || m.name === orderItem.name);
+      if (menuItem && menuItem.ingredients && menuItem.ingredients.length > 0) {
+        for (const ing of menuItem.ingredients) {
+          const invIdx = inventory.findIndex(inv => 
+            inv.name.trim().toLowerCase() === ing.inventoryName.trim().toLowerCase()
+          );
+          if (invIdx !== -1) {
+            const deductQty = (ing.amount || 1) * orderItem.qty;
+            inventory[invIdx].quantity = Math.max(0, (inventory[invIdx].quantity || 0) - deductQty);
+            inventoryChanged = true;
+          }
+        }
+      } else {
+        // Direct match with inventory associatedPosItem or name
+        const invIdx = inventory.findIndex(inv => 
+          inv.associatedPosItem === orderItem.name || inv.name.trim().toLowerCase() === orderItem.name.trim().toLowerCase()
+        );
+        if (invIdx !== -1) {
+          const deductQty = orderItem.qty;
+          inventory[invIdx].quantity = Math.max(0, (inventory[invIdx].quantity || 0) - deductQty);
+          inventoryChanged = true;
+        }
+      }
+    }
+
+    if (inventoryChanged) {
+      saveLocalData('inventory.json', inventory);
+      console.log(`📦 Auto-deducted inventory items for paid POS order ${order.orderNo}`);
+    }
+  } catch (err) {
+    console.error('Error auto-deducting inventory for POS order:', err);
+  }
+
+  return order;
+}
+
+export async function deletePosOrder(id) {
+  const orders = await getPosOrders();
+  const order = orders.find(o => o.id === id);
+  if (order && order.tableId && order.tableId !== 'Takeaway' && order.tableId !== 'Delivery') {
+    await updatePosTable(order.tableId, 'available', null);
+  }
+  const filtered = orders.filter(o => o.id !== id);
+  saveLocalData('pos_orders.json', filtered);
+  return true;
+}
+

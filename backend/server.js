@@ -23,7 +23,18 @@ import {
   updateInventoryItem,
   deleteInventoryItem,
   getUsers,
-  saveUsers
+  saveUsers,
+  getPosMenuItems,
+  addPosMenuItem,
+  updatePosMenuItem,
+  deletePosMenuItem,
+  getPosTables,
+  updatePosTable,
+  getPosOrders,
+  addPosOrder,
+  updatePosOrder,
+  payPosOrder,
+  deletePosOrder
 } from './db.js';
 
 dotenv.config();
@@ -898,6 +909,120 @@ app.get('/api/events', (req, res) => {
     removeSseClient(res);
     console.log(`[SSE] Client disconnected. Active clients: ${getSseClientsCount()}`);
   });
+});
+
+// --- POS (Point of Sale) API Routes ---
+
+// Get all POS Menu Items
+app.get('/api/pos/menu', async (req, res) => {
+  try {
+    const menu = await getPosMenuItems();
+    res.json(menu);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add POS Menu Item
+app.post('/api/pos/menu', async (req, res) => {
+  try {
+    const newItem = await addPosMenuItem(req.body);
+    res.status(201).json(newItem);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update POS Menu Item
+app.put('/api/pos/menu/:id', async (req, res) => {
+  try {
+    const updated = await updatePosMenuItem(req.params.id, req.body);
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete POS Menu Item
+app.delete('/api/pos/menu/:id', async (req, res) => {
+  try {
+    await deletePosMenuItem(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get POS Tables
+app.get('/api/pos/tables', async (req, res) => {
+  try {
+    const tables = await getPosTables();
+    res.json(tables);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update POS Table Status
+app.put('/api/pos/tables/:id', async (req, res) => {
+  try {
+    const { status, orderId } = req.body;
+    const updated = await updatePosTable(req.params.id, status, orderId);
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get POS Orders
+app.get('/api/pos/orders', async (req, res) => {
+  try {
+    const orders = await getPosOrders();
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create New POS Order
+app.post('/api/pos/orders', async (req, res) => {
+  try {
+    const order = await addPosOrder(req.body);
+    res.status(201).json(order);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update POS Order Status
+app.put('/api/pos/orders/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    const updated = await updatePosOrder(req.params.id, { status });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Pay POS Order (Confirm Payment & Auto-deduct inventory)
+app.post('/api/pos/orders/:id/pay', async (req, res) => {
+  try {
+    const paidOrder = await payPosOrder(req.params.id, req.body);
+    res.json(paidOrder);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete / Cancel POS Order
+app.delete('/api/pos/orders/:id', async (req, res) => {
+  try {
+    await deletePosOrder(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Catch-all route to serve the React frontend index.html

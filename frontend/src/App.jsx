@@ -13,7 +13,8 @@ import {
   Users,
   LogOut,
   Menu,
-  X
+  X,
+  ShoppingBag
 } from 'lucide-react';
 import Dashboard from './components/Dashboard.jsx';
 import SopManager from './components/SopManager.jsx';
@@ -23,6 +24,7 @@ import LogConsole from './components/LogConsole.jsx';
 import InventoryManager from './components/InventoryManager.jsx';
 import Login from './components/Login.jsx';
 import StaffManagement from './components/StaffManagement.jsx';
+import PosManager from './components/PosManager.jsx';
 
 export default function App() {
   const [view, setView] = useState('dashboard');
@@ -69,7 +71,7 @@ export default function App() {
     setCurrentUser(user);
     localStorage.setItem('currentUser', JSON.stringify(user));
     if (user.role === 'staff') {
-      setView('inventory');
+      setView('pos');
     } else {
       setView('dashboard');
     }
@@ -81,10 +83,10 @@ export default function App() {
     setView('dashboard');
   };
 
-  // Redirect staff to allowed views (only inventory, since dashboard/SOP is removed for staff)
+  // Redirect staff to allowed views (pos or inventory)
   useEffect(() => {
-    if (role === 'staff' && view !== 'inventory') {
-      setView('inventory');
+    if (role === 'staff' && view !== 'inventory' && view !== 'pos') {
+      setView('pos');
     }
   }, [role, view]);
 
@@ -401,6 +403,13 @@ export default function App() {
               </button>
             </li>
           )}
+
+          <li className={`menu-item ${view === 'pos' ? 'active' : ''}`}>
+            <button onClick={() => { setInventoryFilterName(''); setView('pos'); setIsMobileMenuOpen(false); }}>
+              <ShoppingBag size={20} className="icon" />
+              <span>ระบบหน้าร้านขายอาหาร (POS)</span>
+            </button>
+          </li>
           
           {(role === 'admin' || role === 'manager') && (
             <>
@@ -486,6 +495,7 @@ export default function App() {
           <div className="header-title">
             <h1>
               {view === 'dashboard' && ((role === 'admin' || role === 'manager') ? 'แดชบอร์ดสรุปผลรวม' : 'ตารางงานและการแจ้งเตือน SOP')}
+              {view === 'pos' && 'ระบบขายหน้าร้าน (Point of Sale)'}
               {view === 'sops' && 'คลังคู่มือและขั้นตอนการปฏิบัติงาน'}
               {view === 'scheduler' && 'ระบบตั้งเวลาอัตโนมัติ (Cron Scheduler)'}
               {view === 'inventory' && ((role === 'admin' || role === 'manager') ? 'ระบบคลังวัตถุดิบและการกระทบยอดขาย POS' : 'บันทึกจัดซื้อนำเข้าวัตถุดิบ')}
@@ -568,6 +578,13 @@ export default function App() {
             {view === 'staff_management' && (role === 'admin' || role === 'manager') && (
               <StaffManagement 
                 currentUser={currentUser} 
+              />
+            )}
+
+            {view === 'pos' && (
+              <PosManager 
+                inventory={inventory} 
+                onRefreshInventory={fetchData} 
               />
             )}
 
