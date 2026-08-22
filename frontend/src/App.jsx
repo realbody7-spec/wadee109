@@ -358,6 +358,54 @@ export default function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  // --- STANDALONE POS APPLICATION MODE ---
+  if (view === 'pos') {
+    return (
+      <div className="min-h-screen bg-slate-100 p-4 md:p-6 font-sans">
+        {/* Dedicated Standalone Top Bar */}
+        <div className="max-w-7xl mx-auto mb-5 flex items-center justify-between bg-white px-6 py-3.5 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-600 rounded-xl text-white shadow-md shadow-indigo-100">
+              <ShoppingBag className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="font-bold text-slate-800 text-base">ระบบหน้าร้านขายอาหาร POS (Standalone Cashier Terminal)</h1>
+              <p className="text-xs text-slate-500">ระบบแคชเชียร์ขายหน้าร้าน เปิดโต๊ะ สั่งอาหาร คำนวณบิล และตัดสต็อก</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-slate-600 font-medium">แคชเชียร์: <strong>{currentUser.name}</strong></span>
+            </div>
+
+            {(role === 'admin' || role === 'manager') && (
+              <button
+                onClick={() => setView('dashboard')}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all flex items-center gap-1.5"
+              >
+                ⚙️ ระบบหลังร้าน & SOP
+              </button>
+            )}
+
+            <button
+              onClick={handleLogout}
+              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold rounded-xl transition-all"
+            >
+              ออกจากระบบ
+            </button>
+          </div>
+        </div>
+
+        {/* Dedicated POS Main Content */}
+        <div className="max-w-7xl mx-auto">
+          <PosManager inventory={inventory} onRefreshInventory={fetchData} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       {/* Mobile Top Navbar */}
@@ -578,13 +626,6 @@ export default function App() {
             {view === 'staff_management' && (role === 'admin' || role === 'manager') && (
               <StaffManagement 
                 currentUser={currentUser} 
-              />
-            )}
-
-            {view === 'pos' && (
-              <PosManager 
-                inventory={inventory} 
-                onRefreshInventory={fetchData} 
               />
             )}
 
