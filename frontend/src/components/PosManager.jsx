@@ -27,8 +27,11 @@ import {
   Home,
   Tag,
   FileText,
-  ChevronUp,
-  Layers
+  ChevronRight,
+  Layers,
+  Sparkles,
+  Edit3,
+  Check
 } from 'lucide-react';
 
 export default function PosManager({ inventory = [], onRefreshInventory }) {
@@ -42,7 +45,7 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
   const [loading, setLoading] = useState(true);
 
   // Cart & Order state
-  const [selectedTable, setSelectedTable] = useState('Takeaway');
+  const [selectedTable, setSelectedTable] = useState('T01');
   const [selectedOrderType, setSelectedOrderType] = useState('dine-in'); // 'dine-in' | 'takeaway' | 'delivery'
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,24 +60,13 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
   const [cashReceived, setCashReceived] = useState('');
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptOrder, setReceiptOrder] = useState(null);
-  const [tableModalOpen, setTableModalOpen] = useState(false);
-  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-  const [discountModalOpen, setDiscountModalOpen] = useState(false);
 
-  // Setup Form State
-  const [editingItem, setEditingItem] = useState(null);
-  const [itemForm, setItemForm] = useState({
-    name: '',
-    category: 'main',
-    price: '',
-    description: '',
-    image: '',
-    ingredients: []
-  });
+  // Quick Preset Notes for Food
+  const presetNotes = ['ไม่เผ็ด', 'เผ็ดน้อย', 'เผ็ดมาก', 'หวานน้อย', 'ไม่ใส่ผัก', 'แยกน้ำ', 'เพิ่มไข่ดาว'];
 
   const categories = [
     { id: 'all', name: 'ทั้งหมด', icon: UtensilsCrossed },
-    { id: 'main', name: 'อาหารจานหลัก', icon: UtensilsCrossed },
+    { id: 'main', name: 'จานหลัก', icon: UtensilsCrossed },
     { id: 'soup', name: 'ต้ม & แกง', icon: Soup },
     { id: 'appetizer', name: 'ทานเล่น', icon: ChefHat },
     { id: 'beverage', name: 'เครื่องดื่ม', icon: Coffee },
@@ -130,6 +122,21 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
     });
   };
 
+  const addPresetNoteToItem = (id, noteText) => {
+    setCart(prevCart => prevCart.map(i => {
+      if (i.id === id) {
+        const existingNotes = i.notes ? i.notes.split(', ') : [];
+        if (existingNotes.includes(noteText)) {
+          const filtered = existingNotes.filter(n => n !== noteText);
+          return { ...i, notes: filtered.join(', ') };
+        } else {
+          return { ...i, notes: [...existingNotes, noteText].join(', ') };
+        }
+      }
+      return i;
+    }));
+  };
+
   const updateCartNotes = (id, notes) => {
     setCart(prevCart => prevCart.map(i => i.id === id ? { ...i, notes } : i));
   };
@@ -181,7 +188,7 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
         setCashReceived(createdOrder.total.toString());
         setPaymentModalOpen(true);
       } else {
-        alert(`บันทึกและส่งออเดอร์ ${createdOrder.orderNo} เข้าครัวเรียบร้อยแล้ว!`);
+        alert(`บันทึกส่งออเดอร์ ${createdOrder.orderNo} เข้าครัวเรียบร้อยแล้ว!`);
       }
     } catch (err) {
       console.error('Error creating order:', err);
@@ -256,84 +263,129 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
   const selectedTableObj = tables.find(t => t.id === selectedTable);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] min-h-[650px] bg-slate-200 overflow-hidden font-sans select-none rounded-2xl shadow-xl border border-slate-300">
+    <div className="flex flex-col h-[calc(100vh-80px)] min-h-[680px] bg-slate-100 overflow-hidden font-sans select-none rounded-3xl shadow-2xl border border-slate-300">
       
-      {/* ================= MAIN CONTENT SPLIT (TOP 90%) ================= */}
+      {/* ================= TOP POS WORKSPACE (90% HEIGHT) ================= */}
       <div className="flex-1 flex overflow-hidden">
         
-        {/* ------------ LEFT SIDE: FOOD ITEMS GRID (70% WIDTH) ------------ */}
+        {/* ------------ LEFT SIDE: MENU & FOOD SELECTION GRID (70% WIDTH) ------------ */}
         <div className="w-[68%] lg:w-[72%] bg-slate-100 p-4 flex flex-col justify-between overflow-y-auto">
           
-          {/* Top Search & Category Bar */}
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="ค้นหาเมนูอาหาร..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
-              />
+          {/* Header Search & Category Filter */}
+          <div className="space-y-3 mb-3 shrink-0">
+            <div className="flex items-center justify-between gap-3">
+              {/* Search Box */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="พิมพ์ค้นหาเมนูอาหาร..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-2xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-400 shadow-2xs"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Order Mode Badge */}
+              <div className="hidden sm:flex items-center gap-2 bg-white px-3 py-2 rounded-2xl border border-slate-200 shadow-2xs text-xs font-bold text-slate-700">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>โหมด: {selectedOrderType === 'takeaway' ? '🛍️ สั่งกลับบ้าน' : selectedOrderType === 'delivery' ? '🛵 เดลิเวอรี' : `🪑 ${selectedTableObj?.name || selectedTable}`}</span>
+              </div>
             </div>
 
-            {/* Category Quick Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-[50%] scrollbar-none">
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                    selectedCategory === cat.id
-                      ? 'bg-slate-800 text-white shadow-sm'
-                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {cat.name}
-                </button>
-              ))}
+            {/* Category Chips Selector */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {categories.map(cat => {
+                const Icon = cat.icon;
+                const count = cat.id === 'all' ? menuItems.length : menuItems.filter(m => m.category === cat.id).length;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all shadow-2xs ${
+                      selectedCategory === cat.id
+                        ? 'bg-slate-900 text-white shadow-md'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{cat.name}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                      selectedCategory === cat.id ? 'bg-slate-700 text-slate-200' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Grid View Selection: Menu vs Tables vs Orders vs Setup */}
+          {/* MAIN GRID VIEW: FOOD MENU */}
           {bottomNav === 'menu' && (
-            <div className="flex-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 overflow-y-auto pr-1">
-              {filteredMenu.map(item => (
-                <div
-                  key={item.id}
-                  onClick={() => addToCart(item)}
-                  className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-400 transition-all cursor-pointer flex flex-col justify-between group active:scale-95"
-                >
-                  <div className="aspect-square w-full bg-slate-100 overflow-hidden relative">
-                    <img
-                      src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop'}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                    />
-                    <span className="absolute top-1.5 right-1.5 px-2 py-0.5 bg-slate-900/85 backdrop-blur-md text-white text-[11px] font-extrabold rounded-md shadow">
-                      ฿{item.price}
-                    </span>
-                  </div>
+            <div className="flex-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3.5 overflow-y-auto pr-1">
+              {filteredMenu.map(item => {
+                const cartQty = cart.find(c => c.id === item.id)?.qty || 0;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => addToCart(item)}
+                    className={`bg-white rounded-2xl overflow-hidden border transition-all cursor-pointer flex flex-col justify-between group active:scale-95 relative ${
+                      cartQty > 0 ? 'border-indigo-600 ring-2 ring-indigo-500/20 shadow-md' : 'border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-400'
+                    }`}
+                  >
+                    {/* Quantity Badge on food card */}
+                    {cartQty > 0 && (
+                      <div className="absolute top-2 left-2 z-10 bg-indigo-600 text-white w-6 h-6 rounded-full text-xs font-black flex items-center justify-center shadow-md animate-in zoom-in-50">
+                        {cartQty}
+                      </div>
+                    )}
 
-                  <div className="p-2.5 text-center bg-white border-t border-slate-100">
-                    <h3 className="font-bold text-slate-800 text-xs line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                      {item.name}
-                    </h3>
+                    {/* Food Image Container */}
+                    <div className="aspect-4/3 w-full bg-slate-100 overflow-hidden relative">
+                      <img
+                        src={item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop'}
+                        alt={item.name}
+                        className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-300"
+                      />
+                      {/* Price Badge */}
+                      <span className="absolute bottom-2 right-2 px-2.5 py-1 bg-slate-900/85 backdrop-blur-md text-white text-xs font-black rounded-xl shadow-md">
+                        ฿{item.price}
+                      </span>
+                    </div>
+
+                    {/* Food Details Title */}
+                    <div className="p-2.5 text-center bg-white">
+                      <h3 className="font-bold text-slate-800 text-xs line-clamp-1 group-hover:text-indigo-600 transition-colors">
+                        {item.name}
+                      </h3>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
-          {/* TABLES VIEW (IF CLICKED FROM BOTTOM NAV) */}
+          {/* TABLES SELECTION GRID */}
           {bottomNav === 'tables' && (
-            <div className="flex-1 bg-white p-5 rounded-2xl border border-slate-200 overflow-y-auto space-y-4">
-              <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3">
-                <TableIcon className="w-5 h-5 text-indigo-600" />
-                เลือกโต๊ะอาหาร (Table Selection)
-              </h2>
+            <div className="flex-1 bg-white p-6 rounded-3xl border border-slate-200/90 overflow-y-auto space-y-4 shadow-2xs">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                  <TableIcon className="w-5 h-5 text-indigo-600" />
+                  เลือกโต๊ะอาหาร (Table Selection)
+                </h2>
+                <div className="flex items-center gap-4 text-xs font-semibold">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500"></span> ว่าง (Available)</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-500"></span> กำลังใช้บริการ (Occupied)</span>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3.5">
                 {tables.map(tbl => (
                   <button
                     key={tbl.id}
@@ -342,7 +394,7 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
                       setSelectedOrderType('dine-in');
                       setBottomNav('menu');
                     }}
-                    className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-between min-h-[100px] ${
+                    className={`p-4 rounded-2xl border-2 text-center transition-all flex flex-col items-center justify-between min-h-[110px] active:scale-95 ${
                       selectedTable === tbl.id
                         ? 'bg-indigo-50 border-indigo-600 text-indigo-900 shadow-md font-bold'
                         : tbl.status === 'occupied'
@@ -351,10 +403,10 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
                     }`}
                   >
                     <TableIcon className="w-6 h-6 mb-1" />
-                    <span className="text-sm font-extrabold">{tbl.name}</span>
+                    <span className="text-sm font-black">{tbl.name}</span>
                     <span className="text-[10px] text-slate-500">{tbl.capacity} ที่นั่ง</span>
                     {tbl.status === 'occupied' && (
-                      <span className="mt-1 px-2 py-0.5 bg-amber-500 text-white text-[9px] font-bold rounded-full">กำลังใช้งาน</span>
+                      <span className="mt-1 px-2 py-0.5 bg-amber-500 text-white text-[9px] font-extrabold rounded-full">มีลูกค้า</span>
                     )}
                   </button>
                 ))}
@@ -362,41 +414,41 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
             </div>
           )}
 
-          {/* ORDERS VIEW (KDS) */}
+          {/* ACTIVE ORDERS LIST (KDS) */}
           {bottomNav === 'orders' && (
-            <div className="flex-1 bg-white p-5 rounded-2xl border border-slate-200 overflow-y-auto space-y-4">
+            <div className="flex-1 bg-white p-6 rounded-3xl border border-slate-200/90 overflow-y-auto space-y-4 shadow-2xs">
               <h2 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3">
                 <ChefHat className="w-5 h-5 text-indigo-600" />
-                ออเดอร์ทั้งหมด ({orders.length})
+                รายการออเดอร์ทั้งหมด ({orders.length})
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {orders.map(order => (
-                  <div key={order.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                  <div key={order.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/80 space-y-3 shadow-2xs">
                     <div className="flex justify-between items-start border-b pb-2">
                       <div>
-                        <span className="font-bold text-sm text-slate-800">{order.orderNo}</span>
+                        <span className="font-bold text-sm text-slate-900">{order.orderNo}</span>
                         <p className="text-xs text-slate-500">{order.tableName}</p>
                       </div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
                         order.status === 'paid' ? 'bg-slate-900 text-white' : 'bg-amber-100 text-amber-800'
                       }`}>
-                        {order.status}
+                        {order.status === 'pending' ? '⏳ รอยืนยัน' : order.status === 'cooking' ? '🍳 ปรุงอาหาร' : order.status === 'served' ? '✅ เสิร์ฟแล้ว' : '💳 ชำระแล้ว'}
                       </span>
                     </div>
 
-                    <div className="space-y-1 text-xs text-slate-700 max-h-32 overflow-y-auto">
+                    <div className="space-y-1 text-xs text-slate-700 max-h-36 overflow-y-auto">
                       {order.items.map((it, idx) => (
                         <div key={idx} className="flex justify-between">
                           <span>{it.qty}x {it.name}</span>
-                          <span>฿{it.price * it.qty}</span>
+                          <span className="font-semibold">฿{it.price * it.qty}</span>
                         </div>
                       ))}
                     </div>
 
                     <div className="flex justify-between items-center border-t pt-2 text-xs font-bold">
                       <span>ยอดสุทธิ</span>
-                      <span className="text-indigo-600">฿{order.total}</span>
+                      <span className="text-indigo-600 text-sm">฿{order.total}</span>
                     </div>
                   </div>
                 ))}
@@ -405,64 +457,82 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
           )}
         </div>
 
-        {/* ------------ RIGHT SIDE: ORDER BILL SIDEBAR (32% WIDTH) ------------ */}
-        <div className="w-[32%] lg:w-[28%] bg-white border-l border-slate-300 flex flex-col justify-between shadow-lg">
+        {/* ------------ RIGHT SIDE: ORDER RECEIPT SIDEBAR (32% WIDTH) ------------ */}
+        <div className="w-[32%] lg:w-[28%] bg-white border-l border-slate-200/90 flex flex-col justify-between shadow-xl z-10">
           
-          {/* Bill Top Bar: Table & Customer selector */}
+          {/* Bill Top Bar */}
           <div>
-            <div className="p-3.5 bg-slate-50 border-b border-slate-200 space-y-2">
+            <div className="p-4 bg-slate-50/90 border-b border-slate-200 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-semibold">สถานที่ / รูปแบบ:</span>
-                <span className="font-extrabold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200">
+                <span className="text-slate-500 font-bold">สถานที่ / โต๊ะ:</span>
+                <span className="font-black text-indigo-700 bg-indigo-50 px-3 py-1 rounded-xl border border-indigo-200 shadow-2xs">
                   {selectedOrderType === 'takeaway' ? '🛍️ สั่งกลับบ้าน' : selectedOrderType === 'delivery' ? '🛵 เดลิเวอรี' : `🪑 ${selectedTableObj?.name || selectedTable}`}
                 </span>
               </div>
 
               {cart.length > 0 && (
                 <div className="flex justify-between items-center pt-1">
-                  <span className="text-[11px] text-slate-400">รายการสั่งซื้อในบิล</span>
-                  <button onClick={clearCart} className="text-[11px] text-rose-500 font-bold hover:underline">
-                    ล้างบิล
+                  <span className="text-xs text-slate-400 font-medium">รายการในบิล ({cart.reduce((a, b) => a + b.qty, 0)} ชิ้น)</span>
+                  <button onClick={clearCart} className="text-xs text-rose-500 font-bold hover:underline flex items-center gap-1">
+                    <Trash2 className="w-3 h-3" /> ล้างบิล
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Itemized Cart List */}
-            <div className="p-3 space-y-2 max-h-[350px] overflow-y-auto">
+            {/* Cart Itemized List */}
+            <div className="p-3.5 space-y-3 max-h-[360px] overflow-y-auto">
               {cart.length === 0 ? (
-                <div className="py-20 text-center text-slate-400 space-y-2">
-                  <UtensilsCrossed className="w-8 h-8 mx-auto stroke-1 text-slate-300" />
-                  <p className="text-xs font-medium">ไม่มีรายการสินค้าในบิล</p>
-                  <p className="text-[10px] text-slate-400">เลือกเมนูอาหารทางด้านซ้ายเพื่อสั่งซื้อ</p>
+                <div className="py-24 text-center text-slate-400 space-y-2">
+                  <UtensilsCrossed className="w-10 h-10 mx-auto stroke-1 text-slate-300" />
+                  <p className="text-xs font-bold text-slate-600">ไม่มีรายการในบิล</p>
+                  <p className="text-[11px] text-slate-400">เลือกเมนูอาหารด้านซ้ายเพื่อสั่งซื้อ</p>
                 </div>
               ) : (
                 cart.map(item => (
-                  <div key={item.id} className="py-2 border-b border-slate-100 space-y-1">
+                  <div key={item.id} className="p-2.5 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-2 shadow-2xs">
                     <div className="flex justify-between items-start text-xs font-bold text-slate-800">
                       <span className="line-clamp-1">{item.name}</span>
-                      <span className="text-slate-900">฿{(item.price * item.qty).toFixed(2)}</span>
+                      <span className="text-slate-900 font-black">฿{(item.price * item.qty).toFixed(2)}</span>
                     </div>
 
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-slate-400">฿{item.price} x {item.qty}</span>
+                    {/* Quantity Controls & Price */}
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-400 font-medium">฿{item.price} x {item.qty}</span>
 
-                      {/* Quantity Controls */}
-                      <div className="flex items-center gap-1 bg-slate-100 rounded-md px-1 py-0.5">
+                      <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-1 py-0.5 shadow-2xs">
                         <button
                           onClick={() => updateCartQty(item.id, -1)}
-                          className="w-5 h-5 bg-white rounded flex items-center justify-center font-bold text-slate-600 shadow-2xs hover:bg-slate-200"
+                          className="w-6 h-6 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center font-black text-slate-700 transition-colors"
                         >
                           -
                         </button>
-                        <span className="w-5 text-center font-extrabold text-slate-800">{item.qty}</span>
+                        <span className="w-6 text-center font-black text-slate-800 text-xs">{item.qty}</span>
                         <button
                           onClick={() => updateCartQty(item.id, 1)}
-                          className="w-5 h-5 bg-white rounded flex items-center justify-center font-bold text-slate-600 shadow-2xs hover:bg-slate-200"
+                          className="w-6 h-6 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center font-black text-slate-700 transition-colors"
                         >
                           +
                         </button>
                       </div>
+                    </div>
+
+                    {/* Preset Notes Chips */}
+                    <div className="pt-1 flex flex-wrap gap-1">
+                      {presetNotes.map(n => {
+                        const active = item.notes && item.notes.includes(n);
+                        return (
+                          <button
+                            key={n}
+                            onClick={() => addPresetNoteToItem(item.id, n)}
+                            className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold transition-all ${
+                              active ? 'bg-amber-500 text-white font-bold' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ))
@@ -470,16 +540,16 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
             </div>
           </div>
 
-          {/* Bill Bottom Summary & Action Section */}
-          <div className="border-t border-slate-200 p-3.5 bg-slate-50 space-y-3">
-            {/* Member & Discount Action Row */}
+          {/* Bill Footer & Action Buttons Section */}
+          <div className="border-t border-slate-200 p-4 bg-slate-50/90 space-y-3">
+            {/* Member & Discount Action Buttons */}
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => {
                   const name = prompt('ระบุชื่อสมาชิก / ลูกค้า:');
                   if (name) setCustomerName(name);
                 }}
-                className="py-1.5 px-2 bg-white border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-700 flex items-center justify-center gap-1.5 hover:bg-slate-100"
+                className="py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 hover:bg-slate-100 shadow-2xs transition-all"
               >
                 <User className="w-3.5 h-3.5 text-indigo-600" />
                 {customerName ? customerName : 'สมาชิก'}
@@ -490,36 +560,38 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
                   const amt = prompt('ระบุส่วนลดพิเศษ (บาท):', discount);
                   if (amt !== null) setDiscount(parseFloat(amt) || 0);
                 }}
-                className="py-1.5 px-2 bg-white border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-700 flex items-center justify-center gap-1.5 hover:bg-slate-100"
+                className="py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 hover:bg-slate-100 shadow-2xs transition-all"
               >
                 <Percent className="w-3.5 h-3.5 text-indigo-600" />
                 {discount > 0 ? `ลด ฿${discount}` : 'ส่วนลดพิเศษ'}
               </button>
             </div>
 
-            {/* Total Item Count & Big Amount Display */}
+            {/* Subtotal & Net Total Display */}
             <div className="pt-2 border-t border-slate-200 flex justify-between items-end">
               <div>
-                <span className="text-[11px] text-slate-500 block">ทั้งหมด ({cart.reduce((a, b) => a + b.qty, 0)} รายการ)</span>
-                <span className="text-2xl font-black text-slate-900">฿{totalAmount.toFixed(2)}</span>
+                <span className="text-[11px] text-slate-500 block font-medium">รวมสินค้า ({cart.reduce((a, b) => a + b.qty, 0)} ชิ้น)</span>
+                <span className="text-2xl font-black text-slate-900 tracking-tight">฿{totalAmount.toFixed(2)}</span>
               </div>
             </div>
 
-            {/* Two Main Action Buttons: Save (Blue) & Pay (Green) */}
+            {/* DUAL ACTION BUTTONS: SAVE (BLUE) & PAY (GREEN) */}
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 disabled={cart.length === 0}
                 onClick={() => handleCreateOrder(false)}
-                className="py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-1 active:scale-95"
+                className="py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white font-bold rounded-2xl text-sm transition-all shadow-md shadow-blue-200 flex items-center justify-center gap-1.5 active:scale-95"
               >
+                <Check className="w-4 h-4" />
                 บันทึก
               </button>
 
               <button
                 disabled={cart.length === 0}
                 onClick={() => handleCreateOrder(true)}
-                className="py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold rounded-xl text-sm transition-all shadow-md shadow-emerald-200 flex items-center justify-center gap-1 active:scale-95"
+                className="py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white font-bold rounded-2xl text-sm transition-all shadow-md shadow-emerald-200 flex items-center justify-center gap-1.5 active:scale-95"
               >
+                <CreditCard className="w-4 h-4" />
                 ชำระเงิน
               </button>
             </div>
@@ -527,15 +599,15 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
         </div>
       </div>
 
-      {/* ================= BOTTOM POS TOOLBAR (NAVY BAR 10%) ================= */}
-      <div className="h-[64px] bg-[#1e293b] text-slate-300 flex items-center justify-between px-3 shrink-0 border-t border-slate-800">
+      {/* ================= FIXED DARK BOTTOM POS TOOLBAR ================= */}
+      <div className="h-[64px] bg-slate-900 text-slate-300 flex items-center justify-between px-4 shrink-0 border-t border-slate-800 shadow-2xl">
         
         {/* Left Toolbar Items */}
-        <div className="flex items-center gap-1 sm:gap-2">
-          {/* More settings button */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Settings button */}
           <button
             onClick={() => setBottomNav('setup')}
-            className="p-2 hover:bg-slate-700/60 rounded-xl transition-all text-slate-400 hover:text-white"
+            className="p-2 hover:bg-slate-800 rounded-2xl transition-all text-slate-400 hover:text-white"
             title="ตั้งค่า"
           >
             <MoreHorizontal className="w-5 h-5" />
@@ -544,70 +616,70 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
           {/* Tables button */}
           <button
             onClick={() => setBottomNav('tables')}
-            className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all ${
-              bottomNav === 'tables' ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-slate-700/60 text-slate-300'
+            className={`flex flex-col items-center justify-center px-3.5 py-1 rounded-2xl transition-all ${
+              bottomNav === 'tables' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <TableIcon className="w-4 h-4" />
-            <span className="text-[10px] font-semibold mt-0.5">โต๊ะ</span>
+            <span className="text-[10px] font-bold mt-0.5">โต๊ะ</span>
           </button>
 
-          {/* Order Type: Dine-in */}
+          {/* Dine-in Button */}
           <button
             onClick={() => {
               setSelectedOrderType('dine-in');
               setBottomNav('menu');
             }}
-            className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all ${
-              selectedOrderType === 'dine-in' && bottomNav === 'menu' ? 'bg-slate-700 text-white font-bold border-b-2 border-indigo-400' : 'hover:bg-slate-700/60 text-slate-300'
+            className={`flex flex-col items-center justify-center px-3.5 py-1 rounded-2xl transition-all ${
+              selectedOrderType === 'dine-in' && bottomNav === 'menu' ? 'bg-slate-800 text-white font-bold border-b-2 border-indigo-400' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <UtensilsCrossed className="w-4 h-4" />
-            <span className="text-[10px] font-semibold mt-0.5">ทานในร้าน</span>
+            <span className="text-[10px] font-bold mt-0.5">ทานในร้าน</span>
           </button>
 
-          {/* Order Type: Takeaway */}
+          {/* Takeaway Button */}
           <button
             onClick={() => {
               setSelectedOrderType('takeaway');
               setSelectedTable('Takeaway');
               setBottomNav('menu');
             }}
-            className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all ${
-              selectedOrderType === 'takeaway' && bottomNav === 'menu' ? 'bg-slate-700 text-white font-bold border-b-2 border-indigo-400' : 'hover:bg-slate-700/60 text-slate-300'
+            className={`flex flex-col items-center justify-center px-3.5 py-1 rounded-2xl transition-all ${
+              selectedOrderType === 'takeaway' && bottomNav === 'menu' ? 'bg-slate-800 text-white font-bold border-b-2 border-indigo-400' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <ShoppingBag className="w-4 h-4" />
-            <span className="text-[10px] font-semibold mt-0.5">สั่งกลับบ้าน</span>
+            <span className="text-[10px] font-bold mt-0.5">สั่งกลับบ้าน</span>
           </button>
 
-          {/* Order Type: Delivery */}
+          {/* Delivery Button */}
           <button
             onClick={() => {
               setSelectedOrderType('delivery');
               setSelectedTable('Delivery');
               setBottomNav('menu');
             }}
-            className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all ${
-              selectedOrderType === 'delivery' && bottomNav === 'menu' ? 'bg-slate-700 text-white font-bold border-b-2 border-indigo-400' : 'hover:bg-slate-700/60 text-slate-300'
+            className={`flex flex-col items-center justify-center px-3.5 py-1 rounded-2xl transition-all ${
+              selectedOrderType === 'delivery' && bottomNav === 'menu' ? 'bg-slate-800 text-white font-bold border-b-2 border-indigo-400' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <Coffee className="w-4 h-4" />
-            <span className="text-[10px] font-semibold mt-0.5">เดลิเวอรี</span>
+            <span className="text-[10px] font-bold mt-0.5">เดลิเวอรี</span>
           </button>
         </div>
 
         {/* Right Toolbar Items */}
-        <div className="flex items-center gap-1 sm:gap-2">
-          {/* Categories button */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Menu Categories Button */}
           <button
             onClick={() => setBottomNav('menu')}
-            className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all ${
-              bottomNav === 'menu' ? 'bg-slate-700 text-white font-bold' : 'hover:bg-slate-700/60 text-slate-300'
+            className={`flex flex-col items-center justify-center px-3.5 py-1 rounded-2xl transition-all ${
+              bottomNav === 'menu' ? 'bg-slate-800 text-white font-bold' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <Layers className="w-4 h-4" />
-            <span className="text-[10px] font-semibold mt-0.5">เมนูอาหาร</span>
+            <span className="text-[10px] font-bold mt-0.5">เมนูอาหาร</span>
           </button>
 
           {/* Promotion Button */}
@@ -616,21 +688,21 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
               const amt = prompt('ระบุส่วนลดโปรโมชัน (บาท):');
               if (amt) setDiscount(parseFloat(amt) || 0);
             }}
-            className="flex flex-col items-center justify-center px-3 py-1.5 rounded-xl hover:bg-slate-700/60 transition-all text-slate-300"
+            className="flex flex-col items-center justify-center px-3.5 py-1 rounded-2xl hover:bg-slate-800 transition-all text-slate-300"
           >
             <Tag className="w-4 h-4 text-amber-400" />
-            <span className="text-[10px] font-semibold mt-0.5">โปรโมชัน</span>
+            <span className="text-[10px] font-bold mt-0.5">โปรโมชัน</span>
           </button>
 
-          {/* Orders / KDS List button */}
+          {/* Orders / KDS List Button */}
           <button
             onClick={() => setBottomNav('orders')}
-            className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all relative ${
-              bottomNav === 'orders' ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-slate-700/60 text-slate-300'
+            className={`flex flex-col items-center justify-center px-3.5 py-1 rounded-2xl transition-all relative ${
+              bottomNav === 'orders' ? 'bg-indigo-600 text-white font-bold shadow-md' : 'hover:bg-slate-800 text-slate-300'
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span className="text-[10px] font-semibold mt-0.5">ออเดอร์ ({orders.length})</span>
+            <span className="text-[10px] font-bold mt-0.5">ออเดอร์ ({orders.length})</span>
           </button>
         </div>
       </div>
@@ -651,7 +723,7 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
 
             <div className="p-4 bg-slate-900 text-white rounded-2xl text-center">
               <span className="text-xs text-slate-400 block uppercase tracking-wider">ยอดเงินที่ต้องชำระ</span>
-              <span className="text-3xl font-extrabold text-emerald-400">฿{currentPayingOrder.total.toFixed(2)}</span>
+              <span className="text-3xl font-black text-emerald-400">฿{currentPayingOrder.total.toFixed(2)}</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
@@ -719,7 +791,7 @@ export default function PosManager({ inventory = [], onRefreshInventory }) {
                 {parseFloat(cashReceived) >= currentPayingOrder.total && (
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center text-emerald-800">
                     <span className="text-xs font-semibold">เงินทอน (Change):</span>
-                    <span className="text-lg font-extrabold">฿{(parseFloat(cashReceived) - currentPayingOrder.total).toFixed(2)}</span>
+                    <span className="text-lg font-black">฿{(parseFloat(cashReceived) - currentPayingOrder.total).toFixed(2)}</span>
                   </div>
                 )}
               </div>
