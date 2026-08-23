@@ -101,6 +101,7 @@ export async function initDatabase(connectionString, keyInput) {
         console.log('✅ Connected to Supabase via Supabase JS Client successfully!');
         isConnected = true;
         dbMode = 'supabase_js';
+        await autoMigrateLocalData();
         return { success: true, message: 'เชื่อมต่อ Supabase API สำเร็จเรียบร้อยแล้ว!' };
       } else if (testRes.status === 401 || testRes.status === 403) {
         isConnected = false;
@@ -193,36 +194,46 @@ async function createTables() {
 }
 
 async function autoMigrateLocalData() {
-  if (!pool || dbMode !== 'postgres') return;
+  if (!isConnected) return;
 
   try {
-    const invRes = await pool.query('SELECT COUNT(*) FROM inventory');
-    if (parseInt(invRes.rows[0].count, 10) === 0) {
-      const localInv = getLocalData('inventory.json', []);
-      for (const item of localInv) {
-        await pool.query(
-          `INSERT INTO inventory (id, date, name, category, quantity, pieces, unit, cost, bill_number, image, portion_size, portion_unit, associated_pos_item)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-           ON CONFLICT (id) DO NOTHING`,
-          [
-            item.id || `inv-${Date.now()}-${Math.random()}`,
-            item.date || new Date(),
-            item.name || 'วัตถุดิบ',
-            item.category || 'others',
-            item.quantity || 0,
-            item.pieces || 0,
-            item.unit || 'units',
-            item.cost || 0,
-            item.billNumber || '',
-            item.image || '',
-            item.portionSize || 1,
-            item.portionUnit || item.unit || 'units',
-            item.associatedPosItem || ''
-          ]
-        );
-      }
-      if (localInv.length > 0) {
+    const localInv = getLocalData('inventory.json', []);
+    if (localInv.length === 0) return;
+
+    if (dbMode === 'postgres' && pool) {
+      const invRes = await pool.query('SELECT COUNT(*) FROM inventory');
+      if (parseInt(invRes.rows[0].count, 10) === 0) {
+        for (const item of localInv) {
+          await pool.query(
+            `INSERT INTO inventory (id, date, name, category, quantity, pieces, unit, cost, bill_number, image, portion_size, portion_unit, associated_pos_item)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+             ON CONFLICT (id) DO NOTHING`,
+            [
+              item.id || `inv-${Date.now()}-${Math.random()}`,
+              item.date || new Date(),
+              item.name || 'วัตถุดิบ',
+              item.category || 'others',
+              item.quantity || 0,
+              item.pieces || 0,
+              item.unit || 'units',
+              item.cost || 0,
+              item.billNumber || '',
+              item.image || '',
+              item.portionSize || 1,
+              item.portionUnit || item.unit || 'units',
+              item.associatedPosItem || ''
+            ]
+          );
+        }
         console.log(`✨ Migrated ${localInv.length} inventory items from Local JSON to Supabase PostgreSQL.`);
+      }
+    } else if (dbMode === 'supabase_js' && supabaseClient) {
+      const { data, error } = await supabaseClient.from('inventory').select('id');
+      if (!error && data && data.length < localInv.length) {
+        for (const item of localInv) {
+          await supabaseClient.from('inventory').upsert([item], { onConflict: 'id' });
+        }
+        console.log(`✨ Migrated ${localInv.length} inventory items to Supabase Cloud Database.`);
       }
     }
   } catch (err) {
@@ -266,23 +277,30 @@ export async function getInventoryItems() {
     } else if (dbMode === 'supabase_js' && supabaseClient) {
       try {
         const { data, error } = await supabaseClient.from('inventory').select('*').order('date', { ascending: false });
-        if (!error && data) {
-          return data.map(r => ({
-            id: r.id,
-            date: r.date,
-            name: r.name,
-            category: r.category,
-            quantity: parseFloat(r.quantity) || 0,
-            pieces: parseFloat(r.pieces) || 0,
-            unit: r.unit,
-            cost: parseFloat(r.cost) || 0,
-            billNumber: r.billNumber || r.bill_number || '',
-            image: r.image,
-            portionSize: parseFloat(r.portionSize || r.portion_size) || 1,
-            portionUnit: r.portionUnit || r.portion_unit || 'units',
-            associatedPosItem: r.associatedPosItem || r.associated_pos_item || ''
-          }));
-        }
+        const cloudItems = (!error && data) ? data.map(r => ({
+          id: r.id,
+          date: r.date,
+          name: r.name,
+          category: r.category,
+          quantity: parseFloat(r.quantity) || 0,
+          pieces: parseFloat(r.pieces) || 0,
+          unit: r.unit,
+          cost: parseFloat(r.cost) || 0,
+          billNumber: r.billNumber || r.bill_number || '',
+          image: r.image,
+          portionSize: parseFloat(r.portionSize || r.portion_size) || 1,
+          portionUnit: r.portionUnit || r.portion_unit || 'units',
+          associatedPosItem: r.associatedPosItem || r.associated_pos_item || ''
+        })) : [];
+
+        const localItems = getLocalData('inventory.json', []);
+        const mergedMap = new Map();
+        [...cloudItems, ...localItems].forEach(it => {
+          if (it && it.id && !mergedMap.has(it.id)) {
+            mergedMap.set(it.id, it);
+          }
+        });
+        return Array.from(mergedMap.values());
       } catch (e) {
         console.error('Supabase JS query error (getInventoryItems):', e);
       }
