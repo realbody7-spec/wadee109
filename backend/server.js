@@ -608,6 +608,70 @@ app.post('/api/inventory', async (req, res) => {
   res.status(201).json(newItem);
 });
 
+// Import Google Sheets CSV/Data directly into Supabase
+app.post('/api/sync/fetch-sheets', async (req, res) => {
+  const { sheetUrl } = req.body;
+  if (!sheetUrl) return res.status(400).json({ error: 'Sheet URL is required' });
+  
+  const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) return res.status(400).json({ error: 'ลิงก์ Google Sheet ไม่ถูกต้อง' });
+  
+  const sheetId = match[1];
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+  
+  try {
+    const response = await fetch(csvUrl, { redirect: 'follow' });
+    if (!response.ok) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'ไม่สามารถเข้าถึงไฟล์ Google Sheet ได้ กรุณากดปุ่ม "แชร์ (Share)" ใน Google Sheet แล้วเปลี่ยนสิทธิ์เป็น "ทุกคนที่มีลิงก์ (Anyone with the link) - ผู้ดู (Viewer)" ก่อนครับ' 
+      });
+    }
+    
+    const text = await response.text();
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const importedItems = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+      if (cols.length >= 2 && cols[0]) {
+        let itemDate = new Date().toISOString();
+        if (cols[0].includes('/')) {
+          const parts = cols[0].split('/');
+          if (parts.length === 3) {
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+            itemDate = new Date(`${year}-${month}-${day}T08:00:00.000Z`).toISOString();
+          }
+        }
+        
+        const costVal = parseFloat(cols[1].replace(/[^0-9.]/g, '')) || 0;
+        if (costVal > 0) {
+          const newItem = {
+            id: `sheet-item-${Date.now()}-${i}`,
+            date: itemDate,
+            name: cols[2] || `บันทึกนำเข้า (${cols[0]})`,
+            category: 'meat',
+            quantity: 1,
+            unit: 'ชุด',
+            cost: costVal,
+            billNumber: `GS-IMPORT-${i}`,
+            portionSize: 1,
+            portionUnit: 'ชุด'
+          };
+          importedItems.push(newItem);
+          await addInventoryItem(newItem);
+        }
+      }
+    }
+    
+    res.json({ success: true, count: importedItems.length, items: importedItems });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- POS SALES API ---
 app.get('/api/pos-sales', (req, res) => {
   res.json(readData(POS_SALES_FILE, []));
