@@ -33,5 +33,12 @@
     "password": "1234",
     "name": "Top",
     "role": "manager"
+  },
+  {
+    "id": "user-cashier-1",
+    "username": "cashier",
+    "password": "1234",
+    "name": "แคชเชียร์",
+    "role": "cashier"
   }
 ]

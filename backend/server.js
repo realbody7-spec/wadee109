@@ -1073,6 +1073,20 @@ app.listen(PORT, async () => {
       modified = true;
     }
 
+    // 3. Ensure default 'cashier' user exists
+    const cashierExists = users.some(u => u.username === 'cashier');
+    if (!cashierExists) {
+      console.log(`[Migration] Cashier user not found. Creating default 'cashier' user...`);
+      users.push({
+        id: 'user-cashier-1',
+        username: 'cashier',
+        password: '1234',
+        name: 'แคชเชียร์',
+        role: 'cashier'
+      });
+      modified = true;
+    }
+
     if (modified) {
       writeData(USERS_FILE, users);
       console.log(`[Migration] Users migration completed successfully.`);

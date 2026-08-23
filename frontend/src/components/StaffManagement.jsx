@@ -236,7 +236,8 @@ export default function StaffManagement({ currentUser }) {
               onChange={(e) => setRole(e.target.value)}
               disabled={isSubmitting}
             >
-              <option value="staff">👥 พนักงาน (ดูและบันทึกคลังได้อย่างเดียว)</option>
+              <option value="staff">👥 พนักงานทั่วไป (ดูและบันทึกคลังได้อย่างเดียว)</option>
+              <option value="cashier">🛒 แคชเชียร์ (เข้าใช้งานระบบ POS หน้าร้านคำนวณบิลได้อย่างเดียว)</option>
               {currentUser.role === 'admin' && (
                 <>
                   <option value="manager">🔑 ผู้จัดการ (ควบคุมระบบได้เกือบทั้งหมด ยกเว้นการเชื่อมต่อและหน้าล็อก)</option>
@@ -281,7 +282,7 @@ export default function StaffManagement({ currentUser }) {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '1rem 1.25rem',
-                  borderLeft: `4px solid ${u.role === 'admin' ? 'var(--accent-danger)' : u.role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)'}`
+                  borderLeft: `4px solid ${u.role === 'admin' ? 'var(--accent-danger)' : u.role === 'manager' ? 'var(--accent-green)' : u.role === 'cashier' ? 'var(--accent-purple)' : 'var(--accent-blue)'}`
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -289,11 +290,11 @@ export default function StaffManagement({ currentUser }) {
                     width: '40px',
                     height: '40px',
                     borderRadius: '50%',
-                    backgroundColor: u.role === 'admin' ? 'rgba(239, 68, 68, 0.08)' : u.role === 'manager' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(14, 165, 233, 0.08)',
+                    backgroundColor: u.role === 'admin' ? 'rgba(239, 68, 68, 0.08)' : u.role === 'manager' ? 'rgba(16, 185, 129, 0.08)' : u.role === 'cashier' ? 'rgba(139, 92, 246, 0.08)' : 'rgba(14, 165, 233, 0.08)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: u.role === 'admin' ? 'var(--accent-danger)' : u.role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)'
+                    color: u.role === 'admin' ? 'var(--accent-danger)' : u.role === 'manager' ? 'var(--accent-green)' : u.role === 'cashier' ? 'var(--accent-purple)' : 'var(--accent-blue)'
                   }}>
                     {u.role === 'admin' || u.role === 'manager' ? <Shield size={18} /> : <Users size={18} />}
                   </div>
@@ -322,8 +323,8 @@ export default function StaffManagement({ currentUser }) {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <span className={`badge ${u.role === 'admin' ? 'badge-danger' : u.role === 'manager' ? 'badge-success' : 'badge-simulated'}`}>
-                    {u.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : u.role === 'manager' ? 'ผู้จัดการ (Manager)' : 'พนักงาน (Staff)'}
+                  <span className={`badge ${u.role === 'admin' ? 'badge-danger' : u.role === 'manager' ? 'badge-success' : u.role === 'cashier' ? 'badge-simulated' : 'badge-simulated'}`}>
+                    {u.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : u.role === 'manager' ? 'ผู้จัดการ (Manager)' : u.role === 'cashier' ? 'แคชเชียร์ (Cashier)' : 'พนักงานทั่วไป (Staff)'}
                   </span>
                   
                   {editingUserId !== u.id && (currentUser.role === 'admin' || u.username === currentUser.username || u.role === 'staff') && (

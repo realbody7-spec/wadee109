@@ -70,8 +70,10 @@ export default function App() {
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
     localStorage.setItem('currentUser', JSON.stringify(user));
-    if (user.role === 'staff') {
+    if (user.role === 'cashier') {
       setView('pos');
+    } else if (user.role === 'staff') {
+      setView('inventory');
     } else {
       setView('dashboard');
     }
@@ -83,10 +85,18 @@ export default function App() {
     setView('dashboard');
   };
 
-  // Redirect staff to allowed views (pos or inventory)
+  // Role-based access control & redirection
   useEffect(() => {
-    if (role === 'staff' && view !== 'inventory' && view !== 'pos') {
-      setView('pos');
+    if (role === 'staff') {
+      // General staff can ONLY access inventory (procurement), NOT pos
+      if (view !== 'inventory') {
+        setView('inventory');
+      }
+    } else if (role === 'cashier') {
+      // Cashier can access pos and inventory
+      if (view !== 'pos' && view !== 'inventory') {
+        setView('pos');
+      }
     }
   }, [role, view]);
 
@@ -435,9 +445,9 @@ export default function App() {
           <div className="role-switcher-card" style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-sidebar)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>ผู้ใช้งาน:</div>
             <div style={{ fontWeight: '700', color: '#ffffff', fontSize: '0.95rem', marginTop: '0.15rem' }}>{currentUser.name}</div>
-            <div style={{ fontSize: '0.8rem', color: role === 'admin' ? 'var(--accent-danger)' : role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
-              <span className="status-dot" style={{ width: '6px', height: '6px', backgroundColor: role === 'admin' ? 'var(--accent-danger)' : role === 'manager' ? 'var(--accent-green)' : 'var(--accent-blue)', boxShadow: 'none', animation: 'none' }}></span>
-              <span>{role === 'admin' ? 'ผู้ดูแลระบบ' : role === 'manager' ? 'ผู้จัดการร้าน' : 'พนักงาน'}</span>
+            <div style={{ fontSize: '0.8rem', color: role === 'admin' ? 'var(--accent-danger)' : role === 'manager' ? 'var(--accent-green)' : role === 'cashier' ? 'var(--accent-purple)' : 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
+              <span className="status-dot" style={{ width: '6px', height: '6px', backgroundColor: role === 'admin' ? 'var(--accent-danger)' : role === 'manager' ? 'var(--accent-green)' : role === 'cashier' ? 'var(--accent-purple)' : 'var(--accent-blue)', boxShadow: 'none', animation: 'none' }}></span>
+              <span>{role === 'admin' ? 'ผู้ดูแลระบบ' : role === 'manager' ? 'ผู้จัดการร้าน' : role === 'cashier' ? 'แคชเชียร์' : 'พนักงานทั่วไป'}</span>
             </div>
           </div>
         )}
@@ -452,12 +462,14 @@ export default function App() {
             </li>
           )}
 
-          <li className={`menu-item ${view === 'pos' ? 'active' : ''}`}>
-            <button onClick={() => { setInventoryFilterName(''); setView('pos'); setIsMobileMenuOpen(false); }}>
-              <ShoppingBag size={20} className="icon" />
-              <span>ระบบหน้าร้านขายอาหาร (POS)</span>
-            </button>
-          </li>
+          {(role === 'admin' || role === 'manager' || role === 'cashier') && (
+            <li className={`menu-item ${view === 'pos' ? 'active' : ''}`}>
+              <button onClick={() => { setInventoryFilterName(''); setView('pos'); setIsMobileMenuOpen(false); }}>
+                <ShoppingBag size={20} className="icon" />
+                <span>ระบบหน้าร้านขายอาหาร (POS)</span>
+              </button>
+            </li>
+          )}
           
           {(role === 'admin' || role === 'manager') && (
             <>
