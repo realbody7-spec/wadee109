@@ -36,8 +36,19 @@ function saveLocalData(fileName, data) {
 }
 
 export async function initDatabase(connectionString, keyInput) {
-  const dbUrl = (connectionString || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || process.env.SUPABASE_URL || '').trim();
-  const apiKey = (keyInput || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '').trim();
+  let fallbackUrl = '';
+  let fallbackKey = '';
+  try {
+    const settingsPath = path.join(__dirname, 'data', 'settings.json');
+    if (fs.existsSync(settingsPath)) {
+      const s = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      fallbackUrl = s.supabaseDbUrl || '';
+      fallbackKey = s.supabaseApiKey || '';
+    }
+  } catch (e) {}
+
+  const dbUrl = (connectionString || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || process.env.SUPABASE_URL || fallbackUrl || '').trim();
+  const apiKey = (keyInput || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || fallbackKey || '').trim();
   
   if (!dbUrl) {
     console.log('ℹ️ No DATABASE_URL provided. Running with Local JSON storage.');
