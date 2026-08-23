@@ -1,0 +1,44 @@
+[
+  {
+    "id": "user-1",
+    "username": "admin",
+    "password": "1234",
+    "name": "ผู้ดูแลระบบ",
+    "role": "admin"
+  },
+  {
+    "id": "user-2",
+    "username": "staff",
+    "password": "1234",
+    "name": "พนักงานทั่วไป",
+    "role": "staff"
+  },
+  {
+    "id": "user-1782366066703",
+    "username": "Anne",
+    "password": "1234",
+    "name": "พี่แอน",
+    "role": "staff"
+  },
+  {
+    "id": "user-1782366092365",
+    "username": "ong",
+    "password": "1234",
+    "name": "อ่อง",
+    "role": "staff"
+  },
+  {
+    "id": "user-1782366432358",
+    "username": "Top",
+    "password": "1234",
+    "name": "Top",
+    "role": "manager"
+  },
+  {
+    "id": "user-cashier-1",
+    "username": "cashier",
+    "password": "1234",
+    "name": "แคชเชียร์",
+    "role": "cashier"
+  }
+]
