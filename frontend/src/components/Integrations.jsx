@@ -1383,6 +1383,9 @@ function repairAllMonthlyHeaders(sheet) {
                 <label>PostgreSQL URI หรือ Supabase Project URL</label>
                 <input 
                   type="text" 
+                  name="supabase_url_field"
+                  autoComplete="off"
+                  data-lpignore="true"
                   className="form-control"
                   value={supabaseDbUrl}
                   onChange={(e) => setSupabaseDbUrl(e.target.value)}
@@ -1394,6 +1397,9 @@ function repairAllMonthlyHeaders(sheet) {
                 <label>Supabase API Key (Publishable / Service Key)</label>
                 <input 
                   type="password" 
+                  name="supabase_key_field"
+                  autoComplete="new-password"
+                  data-lpignore="true"
                   className="form-control"
                   value={supabaseApiKey}
                   onChange={(e) => setSupabaseApiKey(e.target.value)}
