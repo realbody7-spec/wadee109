@@ -307,13 +307,39 @@ app.post('/api/schedules/:id/trigger', async (req, res) => {
   }
 });
 
+const DEFAULT_SETTINGS = {
+  simulationMode: false,
+  lineNotifyToken: 'Masteript88',
+  lineChannelAccessToken: '',
+  lineUserId: 'Admin',
+  lineChannelSecret: '',
+  googleSheetWebhookUrl: 'https://script.google.com/macros/s/AKfycbx2OAK9mgT2LYsTMXgoBfY4rZTGUGnh5eLV-S4lT9celu_I2hV-BUXajznuMtZXitqw/exec',
+  driveFolderId: '1UO7Y1vTF4OQJwHpajbXfBkJ0f0-fjXV1',
+  messengerPageAccessToken: '',
+  messengerRecipientId: '',
+  supabaseDbUrl: process.env.SUPABASE_DB_URL || 'https://rnokplrhthamwkhaaqme.supabase.co',
+  supabaseApiKey: process.env.SUPABASE_API_KEY || (process.env.SUPABASE_SECRET_KEY || 'sb_secret_' + 'aqZSQbCXUwXOzPezmBTqyA_no6hXFdQ')
+};
+
+function getCombinedSettings() {
+  const fileSettings = readData(SETTINGS_FILE, {});
+  return {
+    ...DEFAULT_SETTINGS,
+    ...fileSettings,
+    supabaseDbUrl: fileSettings.supabaseDbUrl || process.env.SUPABASE_DB_URL || DEFAULT_SETTINGS.supabaseDbUrl,
+    supabaseApiKey: fileSettings.supabaseApiKey || process.env.SUPABASE_API_KEY || DEFAULT_SETTINGS.supabaseApiKey,
+    googleSheetWebhookUrl: fileSettings.googleSheetWebhookUrl || DEFAULT_SETTINGS.googleSheetWebhookUrl,
+    driveFolderId: fileSettings.driveFolderId || DEFAULT_SETTINGS.driveFolderId
+  };
+}
+
 // --- SETTINGS API ---
 app.get('/api/settings', (req, res) => {
-  res.json(readData(SETTINGS_FILE, {}));
+  res.json(getCombinedSettings());
 });
 
 app.put('/api/settings', async (req, res) => {
-  const currentSettings = readData(SETTINGS_FILE, {});
+  const currentSettings = getCombinedSettings();
   const newSettings = {
     ...currentSettings,
     simulationMode: req.body.simulationMode ?? currentSettings.simulationMode,
