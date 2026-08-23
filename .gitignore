@@ -15,8 +15,8 @@ package-lock.json
 # Build outputs
 frontend/dist/
 
-# Local runtime settings and database files (preserve user saved keys)
-backend/data/settings.json
+# Local runtime settings and user data files (permanently preserve user passwords and settings across Git updates)
+backend/data/*.json
 
 # Ignore user uploaded receipt images but keep the uploads folder structure
 backend/public/uploads/*
