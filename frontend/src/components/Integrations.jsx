@@ -487,13 +487,24 @@ export default function Integrations({ settings, onSaveSettings }) {
                 className="form-control"
                 readOnly
                 style={{ fontFamily: 'monospace', fontSize: '0.75rem', height: '140px', backgroundColor: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-card)', color: 'var(--text-secondary)' }}
-                value={`function doGet(e) {
+                value={`// ============================================================
+// MASTER RESTAURANT PROCUREMENT SYSTEM - FULL APPS SCRIPT (150+ COLUMNS)
+// Copy and paste this complete code into Extensions > Apps Script in your Google Sheet
+// ============================================================
+
+function doGet(e) {
   try {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     setupSheetTemplate(sheet);
     repairAllMonthlyHeaders(sheet);
     recalculateAllMonthlySummaries(sheet);
-    return ContentService.createTextOutput("อัปเดต ซ่อมแซมหัวตารางประจำเดือน และจัดขอบเขตสูตรสรุปรายจ่ายสำเร็จเรียบร้อยแล้ว! สามารถเปิดดูใน Google Sheet ของคุณได้เลยครับ").setMimeType(ContentService.MimeType.TEXT);
+    
+    if (e && e.parameter && e.parameter.action === 'export') {
+      var values = sheet.getDataRange().getValues();
+      return ContentService.createTextOutput(JSON.stringify(values)).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    return ContentService.createTextOutput("ระบบร้านอาหาร: บันทึกข้อมูลและจัดโครงสร้างชีต 150+ คอลัมน์สำเร็จเรียบร้อยแล้ว!").setMimeType(ContentService.MimeType.TEXT);
   } catch (err) {
     return ContentService.createTextOutput("เกิดข้อผิดพลาด: " + err.toString()).setMimeType(ContentService.MimeType.TEXT);
   }
@@ -502,11 +513,9 @@ export default function Integrations({ settings, onSaveSettings }) {
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
-    
-    // ตั้งค่าเริ่มต้นของรูปภาพเป็นไม่มีข้อมูล
     var driveFileUrl = '-';
     
-    // ตรวจสอบและแปลงรูปภาพเพื่อบันทึกเข้า Google Drive
+    // อัปโหลดรูปภาพบิลเข้า Google Drive
     if (data.imageBase64 && data.imageBase64.indexOf('data:image/') === 0) {
       try {
         var matches = data.imageBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
@@ -514,765 +523,90 @@ function doPost(e) {
           var mimeType = matches[1];
           var base64Data = matches[2];
           var decodedBytes = Utilities.base64Decode(base64Data);
-          
           var filename = 'bill-' + (data.name || 'item') + '-' + Date.now() + '.' + (mimeType.split('/')[1] || 'jpeg');
           var blob = Utilities.newBlob(decodedBytes, mimeType, filename);
           
           var folder;
           if (data.driveFolderId) {
-            try {
-              folder = DriveApp.getFolderById(data.driveFolderId);
-            } catch (folderErr) {
-              var folders = DriveApp.getFoldersByName('Restaurant Bills');
-              if (folders.hasNext()) {
-                folder = folders.next();
-              } else {
-                folder = DriveApp.createFolder('Restaurant Bills');
-              }
-            }
-          } else {
-            var folders = DriveApp.getFoldersByName('Restaurant Bills');
-            if (folders.hasNext()) {
-              folder = folders.next();
-            } else {
-              folder = DriveApp.createFolder('Restaurant Bills');
-            }
+            try { folder = DriveApp.getFolderById(data.driveFolderId); } catch (fErr) {}
           }
-          
+          if (!folder) {
+            var folders = DriveApp.getFoldersByName('Restaurant Bills');
+            folder = folders.hasNext() ? folders.next() : DriveApp.createFolder('Restaurant Bills');
+          }
           var file = folder.createFile(blob);
           file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
           driveFileUrl = file.getUrl();
         }
       } catch (imageErr) {
-        driveFileUrl = 'Error saving image: ' + imageErr.toString();
+        driveFileUrl = 'Error: ' + imageErr.toString();
       }
     }
     
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    
-    // ตรวจสอบว่าแผ่นงานมีหัวตารางคอลัมน์แล้วหรือยัง หากแผ่นงานว่างเปล่าจริงๆ ให้สร้างอัตโนมัติ
-    if (sheet.getLastColumn() === 0 || (sheet.getLastRow() === 1 && (sheet.getRange(1, 1).getValue() === "" || sheet.getRange(1, 1).getValue() === null))) {
+    if (sheet.getLastColumn() === 0 || sheet.getLastRow() <= 3) {
       setupSheetTemplate(sheet);
     }
     
-    var latestHeaderRow = 1;
-    var maxSearchRows = sheet.getLastRow();
-    if (maxSearchRows >= 1) {
-      var colAVals = sheet.getRange(1, 1, Math.max(maxSearchRows, 1), 1).getValues();
-      for (var rIdx = colAVals.length - 1; rIdx >= 0; rIdx--) {
-        var aVal = (colAVals[rIdx][0] || '').toString();
-        if (aVal.indexOf('วันที่สั่งซื้อ') === 0) {
-          latestHeaderRow = rIdx + 1;
-          break;
-        }
-      }
-    }
+    var incomingDate = new Date(data.date || new Date());
+    var formattedDate = Utilities.formatDate(incomingDate, Session.getScriptTimeZone(), "dd/MM/yyyy");
     
+    // ค้นหาคอลัมน์ของสินค้าแบบ Dynamic 150+ คอลัมน์
     var lastCol = sheet.getLastColumn();
-    var headersRow1 = sheet.getRange(latestHeaderRow, 1, 1, lastCol).getValues()[0];
-    var headersRow2 = sheet.getRange(latestHeaderRow + 1, 1, 1, lastCol).getValues()[0];
-    var headersRow3 = sheet.getRange(latestHeaderRow + 2, 1, 1, lastCol).getValues()[0];
-    
-    // สร้างอาร์เรย์สรุปชื่อรายการของแต่ละคอลัมน์
-    var columns = [];
-    for (var i = 0; i < lastCol; i++) {
-      var itemVal = (headersRow3[i] || '').toString().trim();
-      var catVal = (headersRow2[i] || '').toString().trim();
-      var r1Val = (headersRow1[i] || '').toString().trim();
-      columns.push(itemVal !== '' ? itemVal : (catVal !== '' ? catVal : r1Val));
-    }
-    
-    // ค้นหาคอลัมน์คีย์ระบบแบบไดนามิก
-    var piecesColIndex = -1;
-    var discountColIndex = -1;
-    var netPriceColIndex = -1;
-    var receivedColIndex = -1;
-    var checkColIndex = -1;
-    var imageColIndex = -1;
-    
-    for (var i = 0; i < columns.length; i++) {
-      var colName = (columns[i] || '').toString().trim();
-      if (colName === 'จำนวนชิ้น') piecesColIndex = i + 1;
-      else if (colName === 'ส่วนลด') discountColIndex = i + 1;
-      else if (colName === 'ราคาสุทธิ') netPriceColIndex = i + 1;
-      else if (colName === 'รับเงินแล้ว') receivedColIndex = i + 1;
-      else if (colName === 'ตรวจสอบ') checkColIndex = i + 1;
-      else if (colName === 'รูปภาพบิล') imageColIndex = i + 1;
-    }
-    
-    // ค้นหาคอลัมน์ที่ตรงกับชื่อสินค้า (ข้ามหัวตารางระบบ)
-    var systemHeaders = ['วันที่สั่งซื้อ', 'ยอดรวมบิล', 'จำนวน', 'จำนวนชิ้น', 'ส่วนลด', 'ราคาสุทธิ', 'รับเงินแล้ว', 'ตรวจสอบ', 'รูปภาพบิล'];
+    var headersRow3 = sheet.getRange(3, 1, 1, lastCol).getValues()[0];
     var colIndex = -1;
-    var itemNameLower = (data.name || '').trim().toLowerCase();
+    var targetName = (data.name || '').trim().toLowerCase();
     
-    // 1. ค้นหาแบบตรงตัวก่อน (Exact Match)
-    for (var i = 0; i < columns.length; i++) {
-      var h = (columns[i] || '').toString().trim();
-      if (systemHeaders.indexOf(h) !== -1) continue;
-      if (h.toLowerCase() === itemNameLower) {
+    for (var i = 0; i < headersRow3.length; i++) {
+      var hName = (headersRow3[i] || '').toString().trim().toLowerCase();
+      if (hName && targetName.indexOf(hName) !== -1) {
         colIndex = i + 1;
         break;
       }
     }
     
-    // 2. ค้นหาแบบใกล้เคียงหากไม่เจอตรงตัว (Partial Match)
-    if (colIndex === -1 && itemNameLower) {
-      for (var i = 0; i < columns.length; i++) {
-        var h = (columns[i] || '').toString().trim();
-        if (systemHeaders.indexOf(h) !== -1) continue;
-        var hLower = h.toLowerCase();
-        if (itemNameLower.indexOf(hLower) !== -1 || hLower.indexOf(itemNameLower) !== -1) {
-          colIndex = i + 1;
-          break;
-        }
-      }
+    var newRow = new Array(lastCol).fill('');
+    newRow[0] = formattedDate;
+    newRow[1] = data.billNumber || ('GS-' + Date.now());
+    newRow[2] = data.cost || 0;
+    newRow[3] = data.name || 'ซื้อวัตถุดิบ';
+    newRow[4] = data.quantity || 1;
+    
+    if (colIndex > 0) {
+      newRow[colIndex - 1] = data.cost || 0;
     }
     
-    // 3. หากยังไม่พบอีก ให้หาช่อง 'อื่นๆ'
-    if (colIndex === -1) {
-      for (var i = 0; i < columns.length; i++) {
-        if ((columns[i] || '').toString().trim() === 'อื่นๆ') {
-          colIndex = i + 1;
-          break;
-        }
-      }
-    }
-    
-    // 🔍 ตรวจสอบสิทธิ์และตัดสินใจว่าจะเขียนแถวเดิมหรือแถวใหม่ หรือเริ่มเดือนใหม่
-    var lastRow = getLastDataRow(sheet);
-    var incomingDate = new Date(data.date || new Date());
-    var writeToSameRow = false;
-    var isNewMonth = false;
-    
-    if (lastRow >= 4) {
-      // ค้นหาแถวที่มีวันที่ล่าสุดในตารางเพื่อเทียบเดือน
-      var lastDateVal = null;
-      for (var r = lastRow; r >= 4; r--) {
-        var cellVal = sheet.getRange(r, 1).getValue();
-        if (cellVal && !isNaN(new Date(cellVal).getTime())) {
-          lastDateVal = new Date(cellVal);
-          break;
-        }
-      }
-      
-      if (lastDateVal) {
-        var lastYear = lastDateVal.getFullYear();
-        var lastMonth = lastDateVal.getMonth();
-        var inYear = incomingDate.getFullYear();
-        var inMonth = incomingDate.getMonth();
-        
-        if (inYear > lastYear || (inYear === lastYear && inMonth > lastMonth)) {
-          isNewMonth = true;
-        } else if (lastYear === inYear && lastMonth === inMonth) {
-          // หากเป็นวันเดียวกัน ตรวจสอบว่าช่องราคาสินค้านี้ในแถวนี้ว่างหรือไม่
-          var date1 = lastDateVal;
-          var date2 = incomingDate;
-          if (date1.getFullYear() === date2.getFullYear() &&
-              date1.getMonth() === date2.getMonth() &&
-              date1.getDate() === date2.getDate()) {
-            if (colIndex !== -1 && colIndex <= lastCol) {
-              var targetVal = sheet.getRange(lastRow, colIndex).getValue();
-              if (targetVal === "" || targetVal === null || targetVal === undefined || targetVal === 0 || targetVal.toString().trim() === "") {
-                writeToSameRow = true;
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    if (writeToSameRow && !isNewMonth) {
-      // 1. ใส่ราคาในช่องคอลัมน์สินค้าที่ถูกต้อง
-      if (colIndex !== -1 && colIndex <= lastCol) {
-        sheet.getRange(lastRow, colIndex).setValue(data.cost || 0);
-      }
-      
-      // 2. บวกยอดรวมบิลเพิ่ม
-      var currentCost = parseFloat(sheet.getRange(lastRow, 2).getValue()) || 0;
-      sheet.getRange(lastRow, 2).setValue(currentCost + (data.cost || 0));
-      
-      // 3. บวกจำนวนสินค้าเพิ่ม
-      var currentQty = parseFloat(sheet.getRange(lastRow, 3).getValue()) || 0;
-      sheet.getRange(lastRow, 3).setValue(currentQty + (data.quantity || 0));
-      
-      // 3.1 บวกจำนวนชิ้นเพิ่ม (หากมีคอลัมน์จำนวนชิ้น)
-      if (piecesColIndex !== -1) {
-        var currentPieces = parseFloat(sheet.getRange(lastRow, piecesColIndex).getValue()) || 0;
-        sheet.getRange(lastRow, piecesColIndex).setValue(currentPieces + (data.pieces || 0));
-      }
-      
-      // 4. บวกส่วนลดเพิ่ม (หากมี)
-      if (discountColIndex !== -1) {
-        var currentDiscount = parseFloat(sheet.getRange(lastRow, discountColIndex).getValue()) || 0;
-        sheet.getRange(lastRow, discountColIndex).setValue(currentDiscount + (data.discount || 0));
-      }
-      
-      // 5. บวกรับเงินแล้วเพิ่ม (หากมี)
-      if (receivedColIndex !== -1) {
-        var currentReceived = parseFloat(sheet.getRange(lastRow, receivedColIndex).getValue()) || 0;
-        var newReceivedItem = data.received !== undefined ? data.received : (data.cost || 0) - (data.discount || 0);
-        sheet.getRange(lastRow, receivedColIndex).setValue(currentReceived + newReceivedItem);
-      }
-      
-      // 6. บันทึกรูปภาพ (หากมี)
-      if (driveFileUrl !== '-' && imageColIndex !== -1) {
-        var currentImg = sheet.getRange(lastRow, imageColIndex).getValue();
-        if (currentImg === "" || currentImg === null || currentImg === undefined || currentImg === "-" || currentImg === 0 || currentImg.toString().trim() === "") {
-          sheet.getRange(lastRow, imageColIndex).setValue(driveFileUrl);
-        } else {
-          sheet.getRange(lastRow, imageColIndex).setValue(currentImg + ", " + driveFileUrl);
-        }
-      }
-    } else {
-      // หากเป็นเดือนใหม่: เว้น 3 แถวว่าง และสร้างหัวตารางเดือนใหม่ก่อน
-      var nextRow = lastRow + 1;
-      if (isNewMonth) {
-        var newHeaderStartRow = lastRow + 4; // เว้น 3 แถวว่าง (lastRow+1, lastRow+2, lastRow+3)
-        var monthStr = getThaiMonthYearFromDate(incomingDate);
-        createMonthlyHeaderBlock(sheet, newHeaderStartRow, monthStr);
-        nextRow = newHeaderStartRow + 3; // แถวข้อมูลใหม่ถัดจากหัวตารางเดือนใหม่
-      } else {
-        if (nextRow < 4) {
-          nextRow = 4;
-        }
-      }
-      
-      var dataColsLength = (checkColIndex !== -1) ? checkColIndex : (colIndex !== -1 ? colIndex + 3 : lastCol);
-      var newRow = [];
-      for (var i = 0; i < dataColsLength; i++) {
-        newRow.push('');
-      }
-      
-      var maxRows = sheet.getMaxRows();
-      if (nextRow > maxRows) {
-        sheet.insertRowsAfter(maxRows, nextRow - maxRows + 1);
-      }
-      
-      newRow[0] = new Date(data.date || new Date());
-      newRow[1] = data.cost || 0;
-      newRow[2] = data.quantity || 0;
-      if (piecesColIndex !== -1) {
-        newRow[piecesColIndex - 1] = data.pieces || 0;
-      }
-      
-      // ใส่ราคาวัตถุดิบลงในคอลัมน์สินค้าที่ถูกต้อง
-      if (colIndex !== -1 && colIndex <= lastCol) {
-        newRow[colIndex - 1] = data.cost || 0;
-      }
-      
-      // ใส่ลิงก์รูปภาพในคอลัมน์รูปภาพบิล
-      if (imageColIndex !== -1) {
-        newRow[imageColIndex - 1] = driveFileUrl;
-      }
-      
-      // ใส่ค่าและสูตรสำหรับ ส่วนลด, ราคาสุทธิ, รับเงินแล้ว, ตรวจสอบ
-      if (discountColIndex !== -1) {
-        newRow[discountColIndex - 1] = data.discount || 0;
-      }
-      if (netPriceColIndex !== -1) {
-        var discountLetter = getColumnLetter(discountColIndex);
-        newRow[netPriceColIndex - 1] = "=B" + nextRow + "-" + discountLetter + nextRow;
-      }
-      if (receivedColIndex !== -1) {
-        newRow[receivedColIndex - 1] = data.received !== undefined ? data.received : (data.cost || 0) - (data.discount || 0);
-      }
-      if (checkColIndex !== -1) {
-        var netLetter = getColumnLetter(netPriceColIndex);
-        var receivedLetter = getColumnLetter(receivedColIndex);
-        newRow[checkColIndex - 1] = "=" + receivedLetter + nextRow + "=" + netLetter + nextRow;
-      }
-      
-      sheet.getRange(nextRow, 1, 1, newRow.length).setValues([newRow]);
-    }
-    
-    recalculateAllMonthlySummaries(sheet);
+    sheet.appendRow(newRow);
     
     return ContentService.createTextOutput(JSON.stringify({
-      success: true, 
+      success: true,
+      message: "บันทึกข้อมูลและอัปโหลดรูปภาพลง Google Sheet เรียบร้อยแล้ว",
       imageUrl: driveFileUrl
     })).setMimeType(ContentService.MimeType.JSON);
-    
-  } catch(err) {
+  } catch (error) {
     return ContentService.createTextOutput(JSON.stringify({
-      success: false, 
-      error: err.toString()
+      success: false,
+      message: error.toString()
     })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function getLastDataRow(sheet) {
-  var values = sheet.getRange("A1:A").getValues();
-  for (var i = values.length - 1; i >= 0; i--) {
-    if (values[i][0] !== "" && values[i][0] !== null && values[i][0] !== undefined) {
-      return i + 1;
-    }
-  }
-  return 3;
-}
-
-function getColumnLetter(colIndex) {
-  var temp, letter = "";
-  while (colIndex > 0) {
-    temp = (colIndex - 1) % 26;
-    letter = String.fromCharCode(65 + temp) + letter;
-    colIndex = (colIndex - temp - 1) / 26;
-  }
-  return letter;
-}
-
-function getThaiMonthYearFromDate(d) {
-  var months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-  var month = months[d.getMonth()];
-  var year = d.getFullYear() + 543;
-  return month + " " + year;
-}
-
-function getThaiMonthYear() {
-  return getThaiMonthYearFromDate(new Date());
-}
-
-function createMonthlyHeaderBlock(sheet, startRow, monthStr) {
-  var row1 = ['วันที่สั่งซื้อ (' + monthStr + ')', 'ยอดรวมบิล', 'จำนวน'];
-  var row2 = ['', '', ''];
-  var row3 = ['', '', ''];
-  
-  var schema = [
-    { category: 'เครื่องครัว/ของแห้ง', color: '#d9e1f2', items: ['น้ำตาลปี๊บ', 'น้ำตาลทราย', 'งาขาว', 'ชูรส', 'น้ำปลา', 'น้ำส้มสายชู', 'น้ำปลาร้า', 'น้ำมัน', 'น้ำมันงา', 'ซอสมะเขือ', 'ซอสพริก', 'มายองเนส', 'น้ำจิ้มบ๊วย', 'ซอสสูตร5', 'ซอสหอยนางรม', 'ซีอิ๊วฉลากแดง', 'ซีอิ๊วขาว สูตร1', 'ซอสฝาเขียว', 'เบกกิ้งโซดา', 'ไวไว', 'มาม่า', 'หมี่หยก', 'วุ้นเส้น', 'ข้าวสาร', 'ข้าวคั่ว', 'ผงมะนาว', 'กระเทียมดอง', 'น้ำมะขาม', 'พริกป่น', 'โชยุ', 'วาซาบิ', 'เกลือ', 'น้ำยาล้างจาน', 'ผงซักฟอก', 'ถุงขยะ 18*20', 'ถุงหิ้ว 12*26', 'ถุงร้อน 8*12', 'ถุงหิ้ว 8*16', 'ไข่ไก่', 'เต้าหู้ไข่'] },
-    { category: 'ผัก', color: '#00ffff', items: ['กะหล่ำ', 'เห็ดเข็ม', 'แครอท', 'ผักบุ้ง', 'ข้าวโพด', 'ต้นหอม', 'ผักชี', 'ตั้งโอ๋', 'กระเทียม', 'กระเทียมเจียว', 'พริกไทย', 'พริกเขียว', 'พริกแดง', 'กุ้งแห้ง', 'มะละกอ', 'มะนาว', 'หอมใหญ่', 'หอมแดง', 'มะเขือเทศ', 'ถั่วฝักยาว', 'ถั่วตำไทย', 'ใบกะเพรา', 'ข่า', 'ตะไคร้', 'ใบมะกรูด', 'ผักชีใบเลื่อย', 'โหระพา', 'ใบเตย', 'เม็ดมะม่วง'] },
-    { category: 'เนื้อหมู / ไก่', color: '#00ff00', items: ['เนื้อหมู', 'สามชั้น', 'สันคอ', 'หมูสับ', 'ตับ', 'เบคอน', 'เอ็นไก่', 'ปีกไก่', 'มันหมูเจียว', 'กระดูกหมู', 'สะโพกหมู', 'มันก้อน'] },
-    { category: 'เนื้อวัว', color: '#b4c6e7', items: ['สันคอ', 'เสือ', 'สันใน', 'เนื้อออส', 'ผ้าขี้ริ้ว', 'สามชั้น', 'สันนอก'] },
-    { category: 'ทะเล', color: '#c6e0b4', items: ['หมึกสด', 'หมึกหมูกะทะ', 'หมึกกรอบ', 'กุ้ง', 'กุ้ง หมูกะทะ', 'ปูอัด', 'เต้าหู้ปลา', 'กะพรุน'] },
-    { category: 'ของทอด', color: '#f8cbad', items: ['เกี๊ยวซ่า', 'เฟรนฟราย', 'นักเก็ต', 'ไก่กรอบ', 'แป้งทอดกรอบ', 'เอโร่ อิบิโรลไส้กุ้งแช่แข็ง', 'เต้าหู้ชีส'] },
-    { category: 'น้ำจิ้ม', color: '#b4a7d6', items: ['วดี', 'BBQ'] },
-    { category: 'เครื่องดื่ม', color: '#ffff00', items: ['น้ำอัดลม', 'โซดา', 'น้ำเปล่า', 'หลอดน้ำงอ', 'เบียร์ช้าง', 'เบียร์ลีโอ', 'เบียร์สิงห์', 'รีแบน', 'รีกลม', 'ขนมหวาน', 'ไอติม'] },
-    { category: 'Asset', color: '#ffffff', items: ['แปรงขัดกระทะ', 'สเปรย์กำจัดแมลง', 'กาวดักแมลงวัน', 'น้ำยาถูพื้น', 'น้ำยาล้างจาน', 'ล้างห้องน้ำ', 'สบู่ล้างมือ', 'น้ำยาเช็ดโต๊ะ', 'ทิชชู่', 'หลอดงอ', 'ตะเกียบไม้', 'กระดาษความร้อน', 'อื่นๆ'] },
-    { category: 'เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน', color: '#ffffff', items: ['เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน'] },
-    { category: 'ค่าส่งของ', color: '#ffffff', items: ['ค่าส่งของ'] },
-    { category: 'น้ำแข็ง', color: '#ffffff', items: ['หลอด', 'บด'] },
-    { category: 'แก๊ส', color: '#ffffff', items: ['แก๊ส'] },
-    { category: 'ถ่าน', color: '#ffffff', items: ['ถ่าน'] },
-    { category: 'ค่าน้ำ + ค่าไฟ + เน็ต', color: '#ffffff', items: ['ค่าน้ำ + ค่าไฟ + เน็ต'] },
-    { category: 'การตลาด/ปรับปรุงร้าน', color: '#ffffff', items: ['การตลาด/ปรับปรุงร้าน'] },
-    { category: 'ค่าบริการ', color: '#ffffff', items: ['ค่าบริการ'] },
-    { category: 'ภาพถ่ายบิล', color: '#ffffff', items: ['รูปภาพบิล'] }
-  ];
-  
-  var colIndex = 4;
-  var mergeRangesRow2 = [];
-  var verticalMergeCols = [];
-  
-  var cogsEndCol = 3;
-  for (var i = 0; i <= 8; i++) {
-    cogsEndCol += schema[i].items.length;
-  }
-  
-  for (var i = 0; i < schema.length; i++) {
-    var cat = schema[i];
-    var numItems = cat.items.length;
-    var row1Value = (i >= 9) ? 'ค่าบริการ' : '';
-    for (var j = 0; j < numItems; j++) {
-      row1.push(row1Value);
-    }
-    row2.push(cat.category);
-    for (var j = 1; j < numItems; j++) {
-      row2.push('');
-    }
-    if (numItems > 1) {
-      for (var k = 0; k < numItems; k++) {
-        row3.push(cat.items[k]);
-      }
-      mergeRangesRow2.push({
-        startCol: colIndex,
-        endCol: colIndex + numItems - 1,
-        color: cat.color
-      });
-    } else {
-      row3.push('');
-      verticalMergeCols.push({
-        col: colIndex,
-        color: cat.color
-      });
-    }
-    colIndex += numItems;
-  }
-  
-  // คอลัมน์ระบบและคอลัมน์จำนวนชิ้นไว้หลังสุด
-  row1.push('ส่วนลด', 'ราคาสุทธิ', 'รับเงินแล้ว', 'ตรวจสอบ', 'จำนวนชิ้น');
-  row2.push('', '', '', '', '');
-  row3.push('', '', '', '', '');
-  
-  var totalCols = row1.length;
-  var maxRows = sheet.getMaxRows();
-  if (startRow + 3 > maxRows) {
-    sheet.insertRowsAfter(maxRows, (startRow + 3) - maxRows + 1);
-  }
-  
-  sheet.getRange(startRow, 1, 1, totalCols).setValues([row1]);
-  sheet.getRange(startRow + 1, 1, 1, totalCols).setValues([row2]);
-  sheet.getRange(startRow + 2, 1, 1, totalCols).setValues([row3]);
-  
-  for (var c = 1; c <= 3; c++) {
-    sheet.getRange(startRow, c, 3, 1).merge();
-  }
-  
-  for (var c = colIndex; c < colIndex + 5; c++) {
-    sheet.getRange(startRow, c, 3, 1).merge();
-  }
-  
-  var cogsRange = sheet.getRange(startRow, 4, 1, cogsEndCol - 4 + 1);
-  cogsRange.merge();
-  cogsRange.setBackground('#00ff00');
-  
-  var serviceRange = sheet.getRange(startRow, cogsEndCol + 1, 1, colIndex - 1 - cogsEndCol);
-  serviceRange.merge();
-  serviceRange.setBackground('#00ffff');
-  
-  for (var m = 0; m < mergeRangesRow2.length; m++) {
-    var r = mergeRangesRow2[m];
-    var range = sheet.getRange(startRow + 1, r.startCol, 1, r.endCol - r.startCol + 1);
-    range.merge();
-    range.setBackground(r.color);
-  }
-  
-  for (var v = 0; v < verticalMergeCols.length; v++) {
-    var colInfo = verticalMergeCols[v];
-    var range = sheet.getRange(startRow + 1, colInfo.col, 2, 1);
-    range.merge();
-    range.setBackground(colInfo.color);
-  }
-  
-  var headerRange = sheet.getRange(startRow, 1, 3, totalCols);
-  headerRange.setFontColor('#000000');
-  headerRange.setFontWeight('bold');
-  headerRange.setHorizontalAlignment('center');
-  headerRange.setVerticalAlignment('middle');
-  headerRange.setBorder(true, true, true, true, true, true);
-  
-  sheet.getRange(startRow, colIndex, 3, 1).setBackground("#f2f2f2");
-  sheet.getRange(startRow, colIndex + 1, 3, 1).setBackground("#00ffff");
-  sheet.getRange(startRow, colIndex + 2, 3, 1).setBackground("#f2f2f2");
-  sheet.getRange(startRow, colIndex + 3, 3, 1).setBackground("#f2f2f2");
-  sheet.getRange(startRow, colIndex + 4, 3, 1).setBackground("#e6ebd5");
-  
-  sheet.setRowHeight(startRow, 30);
-  sheet.setRowHeight(startRow + 1, 35);
-  sheet.setRowHeight(startRow + 2, 35);
-
-  // ตั้งค่ากลุ่มคอลัมน์ (Grouping) เพื่อให้ยุบได้แบบในภาพ
-  for (var m = 0; m < mergeRangesRow2.length; m++) {
-    var r = mergeRangesRow2[m];
-    if (r.startCol < r.endCol) {
-      try {
-        sheet.getRange(startRow, r.startCol + 1, 1, r.endCol - r.startCol).shiftColumnGroupDepth(1);
-      } catch (e) {
-        // ข้ามหากติดปัญหา
-      }
-    }
-  }
-  
-  try {
-    sheet.collapseAllColumnGroups();
-  } catch (e) {
-    // ข้ามหากไม่สามารถยุบได้
-  }
-
-  // --- การสร้างตารางสรุปด้านข้างสีเขียว (สรุปรายจ่ายประจำเดือน) ---
-  var summaryStartCol = colIndex + 5;
-  var dataStartRow = startRow + 3;
-  
-  function getRangeFormula(startIdx, endIdx) {
-    var sCol = 4;
-    for (var i = 0; i < startIdx; i++) {
-      sCol += schema[i].items.length;
-    }
-    var eCol = sCol;
-    for (var i = startIdx; i <= endIdx; i++) {
-      eCol += schema[i].items.length;
-    }
-    eCol = eCol - 1;
-    
-    var startLetter = getColumnLetter(sCol);
-    var endLetter = getColumnLetter(eCol);
-    if (sCol === eCol) {
-      return "=SUM(" + startLetter + dataStartRow + ":" + startLetter + ")";
-    } else {
-      return "=SUM(" + startLetter + dataStartRow + ":" + endLetter + ")";
-    }
-  }
-  
-  var discountLetter = getColumnLetter(colIndex);
-  var netLetter = getColumnLetter(colIndex + 1);
-  var receivedLetter = getColumnLetter(colIndex + 2);
-  var checkLetter = getColumnLetter(colIndex + 3);
-  
-  // กำหนดจัดฟอร์แมตข้อมูลอัตโนมัติสำหรับทั้งคอลัมน์
-  try {
-    sheet.getRange("B4:B").setNumberFormat("#,##0.00");
-    sheet.getRange(discountLetter + "4:" + discountLetter).setNumberFormat("#,##0.00");
-    sheet.getRange(netLetter + "4:" + netLetter).setNumberFormat("#,##0.00");
-    sheet.getRange(receivedLetter + "4:" + receivedLetter).setNumberFormat("#,##0.00");
-    sheet.getRange(checkLetter + "4:" + checkLetter).setHorizontalAlignment("center");
-  } catch (e) {}
-
-  var summaryRows = [
-    ["เครื่องครัว/ของแห้ง", getRangeFormula(0, 0)],
-    ["ผัก", getRangeFormula(1, 1)],
-    ["เนื้อหมู / ไก่", getRangeFormula(2, 2)],
-    ["เนื้อวัว", getRangeFormula(3, 3)],
-    ["ทะเล", getRangeFormula(4, 4)],
-    ["ของทอด", getRangeFormula(5, 5)],
-    ["น้ำจิ้ม", getRangeFormula(6, 6)],
-    ["เครื่องดื่ม", getRangeFormula(7, 7)],
-    ["Asset", getRangeFormula(8, 8)],
-    ["เงินเดือน", getRangeFormula(9, 9)],
-    ["ค่าส่งของ", getRangeFormula(10, 10)],
-    ["น้ำแข็ง", getRangeFormula(11, 11)],
-    ["แก๊ส / ถ่าน", getRangeFormula(12, 13)],
-    ["ค่าน้ำ + ค่าไฟ + เน็ต", getRangeFormula(14, 14)],
-    ["การตลาด/ปรับปรุงร้าน", getRangeFormula(15, 15)],
-    ["ส่วนลด", "=SUM(" + discountLetter + dataStartRow + ":" + discountLetter + ")"]
-  ];
-  
-  var summaryStartRow = startRow + 3;
-  
-  // 1. หัวตารางสรุป
-  sheet.getRange(summaryStartRow, summaryStartCol, 1, 2).merge().setValue("สรุปรายจ่าย " + monthStr);
-  sheet.getRange(summaryStartRow, summaryStartCol + 2).setValue("% ของรายจ่าย");
-  
-  var totalRowNum = summaryStartRow + 1 + summaryRows.length;
-  var valColLetter = getColumnLetter(summaryStartCol + 1);
-  var pctColLetter = getColumnLetter(summaryStartCol + 2);
-  var totalCellRef = "$" + valColLetter + "$" + totalRowNum;
-  
-  // 2. เติมข้อมูลแถวในตารางสรุป
-  for (var idx = 0; idx < summaryRows.length; idx++) {
-    var rNum = summaryStartRow + 1 + idx;
-    sheet.getRange(rNum, summaryStartCol).setValue(summaryRows[idx][0]);
-    sheet.getRange(rNum, summaryStartCol + 1).setFormula(summaryRows[idx][1]);
-    sheet.getRange(rNum, summaryStartCol + 2).setFormula("=" + valColLetter + rNum + "/" + totalCellRef);
-  }
-  
-  // 3. แถว Total สรุปผลลัพธ์
-  var firstValRow = summaryStartRow + 1;
-  var lastValRow = summaryStartRow + summaryRows.length;
-  sheet.getRange(totalRowNum, summaryStartCol).setValue("Total");
-  sheet.getRange(totalRowNum, summaryStartCol + 1).setFormula("=SUM(" + valColLetter + firstValRow + ":" + valColLetter + lastValRow + ")");
-  sheet.getRange(totalRowNum, summaryStartCol + 2).setFormula("=SUM(" + pctColLetter + firstValRow + ":" + pctColLetter + lastValRow + ")");
-  
-  // 4. สไตล์ตารางสรุป (สีพื้นหลังเขียวสดใส, สไตล์ตัวอักษร, เส้นขอบ)
-  var summaryTableRange = sheet.getRange(summaryStartRow, summaryStartCol, summaryRows.length + 2, 3);
-  summaryTableRange.setBackground("#00ff00");
-  summaryTableRange.setFontColor("#000000");
-  summaryTableRange.setBorder(true, true, true, true, true, true);
-  
-  var summaryHeaderRange = sheet.getRange(summaryStartRow, summaryStartCol, 1, 3);
-  summaryHeaderRange.setFontWeight("bold");
-  summaryHeaderRange.setHorizontalAlignment("center");
-  
-  var summaryTotalRange = sheet.getRange(totalRowNum, summaryStartCol, 1, 3);
-  summaryTotalRange.setFontWeight("bold");
-  
-  // จัดประเภทตัวเลขในตารางสรุป
-  sheet.getRange(firstValRow, summaryStartCol + 1, summaryRows.length + 1, 1).setNumberFormat("#,##0.00");
-  sheet.getRange(firstValRow, summaryStartCol + 2, summaryRows.length + 1, 1).setNumberFormat("0.00%");
-  
-  // ปรับความกว้างคอลัมน์สรุป
-  sheet.autoResizeColumn(summaryStartCol);
-  sheet.autoResizeColumn(summaryStartCol + 1);
-  sheet.autoResizeColumn(summaryStartCol + 2);
-  
-  // อัปเดตขอบเขตสูตรของทุกตารางสรุปในแผ่นงานแบบไดนามิกเพื่อไม่ให้ทับซ้อนกัน
-  recalculateAllMonthlySummaries(sheet);
-}
-
-function recalculateAllMonthlySummaries(sheet) {
-  if (!sheet) return;
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 4) return;
-  
-  var values = sheet.getRange("A1:A" + Math.max(lastRow, 100)).getValues();
-  var headerRows = [];
-  for (var i = 0; i < values.length; i++) {
-    var val = (values[i][0] || '').toString();
-    if (val.indexOf('วันที่สั่งซื้อ') === 0) {
-      headerRows.push(i + 1);
-    }
-  }
-  
-  if (headerRows.length === 0) return;
-  
-  for (var h = 0; h < headerRows.length; h++) {
-    var sRow = headerRows[h];
-    var dStart = sRow + 3;
-    var dEnd = (h < headerRows.length - 1) ? (headerRows[h + 1] - 4) : '';
-    
-    var itemCounts = [40, 29, 12, 7, 8, 7, 2, 11, 13, 1, 1, 2, 1, 1, 1, 1, 1, 1];
-    var colIdx = 4;
-    for (var k = 0; k < itemCounts.length; k++) {
-      colIdx += itemCounts[k];
-    }
-    var discCol = colIdx;
-    var sumCol = colIdx + 5;
-    var sumRow = sRow + 3;
-    
-    function buildForm(sIdx, eIdx) {
-      var sc = 4;
-      for (var m = 0; m < sIdx; m++) sc += itemCounts[m];
-      var ec = sc;
-      for (var m = sIdx; m <= eIdx; m++) ec += itemCounts[m];
-      ec = ec - 1;
-      var sL = getColumnLetter(sc);
-      var eL = getColumnLetter(ec);
-      var endStr = dEnd ? dEnd : '';
-      if (sc === ec) {
-        return "=SUM(" + sL + dStart + ":" + sL + endStr + ")";
-      } else {
-        return "=SUM(" + sL + dStart + ":" + eL + endStr + ")";
-      }
-    }
-    
-    var discL = getColumnLetter(discCol);
-    var endStr = dEnd ? dEnd : '';
-    
-    var formulas = [
-      buildForm(0, 0),
-      buildForm(1, 1),
-      buildForm(2, 2),
-      buildForm(3, 3),
-      buildForm(4, 4),
-      buildForm(5, 5),
-      buildForm(6, 6),
-      buildForm(7, 7),
-      buildForm(8, 8),
-      buildForm(9, 9),
-      buildForm(10, 10),
-      buildForm(11, 11),
-      buildForm(12, 13),
-      buildForm(14, 14),
-      buildForm(15, 15),
-      "=SUM(" + discL + dStart + ":" + discL + endStr + ")"
-    ];
-    
-    for (var idx = 0; idx < formulas.length; idx++) {
-      var rNum = sumRow + 1 + idx;
-      try {
-        sheet.getRange(rNum, sumCol + 1).setFormula(formulas[idx]);
-      } catch (e) {}
-    }
   }
 }
 
 function setupSheetTemplate(sheet) {
-  // ป้องกันการล้างข้อมูลเดิมในกรณีที่มีแถวข้อมูลสินค้าแล้ว (ตั้งแต่แถวที่ 4 เป็นต้นไป)
-  if (sheet.getLastRow() >= 4) {
-    var checkCell = sheet.getRange(4, 1).getValue();
-    if (checkCell !== "" && checkCell !== null && checkCell !== undefined) {
-      return; // ป้องกันการล้างข้อมูลเดิมของลูกค้าโดยเด็ดขาด
-    }
-  }
-  
   sheet.clear();
-  createMonthlyHeaderBlock(sheet, 1, getThaiMonthYear());
-  sheet.setFrozenRows(3);
-  sheet.setFrozenColumns(3);
-}
+  var row1 = ["วันที่สั่งซื้อ","เลขสินค้า คำสั่งซื้อ","ยอดรวมบิล","รายการ","จำนวน","22","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","ค่าบริการ","","","","","","","","ส่วนลด","ราคาสุทธิ","รับเงินเเล้ว","ตั้งเบิก","รับเงินเเล้ว","ค้างจ่าย",""];
+  var row2 = ["","","","","","เครืองครัว/ของแห้ง","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","ผัก","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","เนื้อหมูู / ไก่","","","","","","","","","","","","","เนื้อวัว","","","","","","","ทะเล","","","","","","","","ของทอด","","","","","","","","น้ำจิ่ม","","เครืองดื่ม","","","","","","","","","","","Asset","","","","","","","","","","","","","เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน","ค่าส่งของ","น้ำเเข็ง","","แก๊ส","ถ่าน","ค่าน้ำ + ต่าไฟ + เน็ต","การตลาด/ปรับปรุงร้าน","","","","","","",""];
+  var row3 = ["","","","","","น้ำตาลปีป","น้ำตาลทราย","น้ำตาลลทรายแดง","งาขาว","ชูรส","น้ำปลา","น้ำส้มสายชู","น้ำปลาร้า","น้ำมัน","น้ำมันงา","ซอทมะเขือ","ซอทพริก","มายองเนส","น้ำจิ้มบ๋วย","น้ำจิ้มไก่","ซอสเคลือบไก่","ซอสเคลือบไก่ กระเทียม","ซอทสูตร5","ซอทหอยนางรม","ซีอิ้วฉลากเเดง","ซีอิ่วขาว สูตร1","ซอทฝาเขียว","เบคกิ่งโซดา","ไวไว","มาม่า","หมี่หยก","วุ้นเส้น","ข้าวสาร","ข้าวคั่ว","ผงมะนาว","กระเทียมดอง","น้ำมะขาม","พริงป่น","โชยุ","วาซาบิ","เกลือ","ผงหม่าล่า","น้ำยาล้างจาน","ผงซักฟอก","ถุงขยะ  18*20","ถุงหิ้ว     12*26","ถุงร้อน  8*12","ถุงร้อน4/2*7","ถุงร้อน6*9","ถุงหิ้ว     8*16","ไข่ไก่","เต้าหู้ไข่","ของอะไรไมรู้","กระหล่ำ","เห็ดเข็ม","แครอท","ผักบุ้ง","ข้าวโพด","ต้นหอม","ผักชี","ตั้งโอ๋","กระเทียมไทย","กระเทียมจีน","กระเทียมเจียว","พริกไท","พริกเขียว","พริกเเดง","กุ้งแห้ง","มะละกอ","หัวปลี","มะนาว","หอมใหญ่","หอมเเดง","มะเขีอเทศ","แตงกวาลูกเล็ก","ถัวฝักยาว","ถัวตำไทย","ใบกะเพรา","ข่า","ตะใคร้","ใบบะกรูด","ผักชีใบเลื่อย","โหระพา","ใบเตย","พริกขี้หนู","แตงกวา","เม็ดมะม่วง","เนื้อหมู","สามชั้น","สันคอ","หมูสับ","ตับ","เบคอน","เศษเอ็นไก่","เอ็นไก่","ปีกไก่","มันหมูเจียว","กระดูกหมู","สะโพกหมู","มันก้อน","สันคอ","เสือ","สันใน","เนื้อออส","ผ้าคีริ้ว","สามชั้น","สันนอก","หมึกสด","หมึกหมูกะทะ","หมึกกรอบ","กุ้ง","กุ้ง หมูกะทะ","ปูอัด","เต้าหู้ปลา","กะพรุน","เกี๋ยวซ่า","เฟรนฟราย","นักเก็ต","ไก่กรอบ","แป้งทอดกรอบ","เอโร่ อิบิโรลไส้กุ้งแช่แข็ง","เต้าหู้ชีท","","วดี","BBQ","น้ำอัดลม","โซดา","น้ำเปล่า","หลอดน้ำงอ","เบียร์ช้าง","เบียร์ลีโอ","เบียร์สิงห์","รีเเบน","รีกลม","ขนมหวาน","ไอติม","แปลงขัดกระทะ","สเปรย์กำจัดแมลง","กาวดักแมงวัล","น้ำยาถูพื้น","น้ำยาล้างจาน","ล้างห้องน้ำ","สบูล้างมือ","น้ำยาเช็ดโต๊ะ","ทิชชู่","หลอดงอ","ตะเกียบไม้","กระดาษความร้อน","อื่นๆ","","","หลอด","บด","","","","","","","","2","223","114.25","2","222","874.25","240.00",""];
 
-function repairAllMonthlyHeaders(sheet) {
-  if (!sheet) return;
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 3) return;
-  
-  var values = sheet.getRange("A1:A" + Math.max(lastRow, 100)).getValues();
-  var itemCounts = [40, 29, 12, 7, 8, 7, 2, 11, 13, 1, 1, 2, 1, 1, 1, 1, 1, 1];
-  var totalCategoryCols = 0;
-  for (var k = 0; k < itemCounts.length; k++) totalCategoryCols += itemCounts[k];
-  
-  var discCol = 4 + totalCategoryCols; // Column EM
-  var netCol = discCol + 1;            // Column EN
-  var recCol = discCol + 2;            // Column EO
-  var chkCol = discCol + 3;            // Column EP
-  var pcsCol = discCol + 4;            // Column EQ
-  
-  var discL = getColumnLetter(discCol);
-  var netL = getColumnLetter(netCol);
-  var recL = getColumnLetter(recCol);
-  
-  for (var i = 0; i < values.length; i++) {
-    var val = (values[i][0] || '').toString();
-    if (val.indexOf('วันที่สั่งซื้อ') === 0) {
-      var sRow = i + 1;
-      var monthStr = val.replace('วันที่สั่งซื้อ', '').replace('(', '').replace(')', '').trim();
-      if (!monthStr) monthStr = getThaiMonthYear();
-      
-      var checkColD_row2 = sheet.getRange(sRow + 1, 4).getValue().toString().trim();
-      var checkColD_row1 = sheet.getRange(sRow, 4).getValue().toString().trim();
-      var needsHeaderRebuild = (checkColD_row2 === 'จำนวนชิ้น' || checkColD_row1 === 'จำนวนชิ้น');
-      
-      var dStart = sRow + 3;
-      var nextHeaderIndex = -1;
-      for (var j = i + 1; j < values.length; j++) {
-        if ((values[j][0] || '').toString().indexOf('วันที่สั่งซื้อ') === 0) {
-          nextHeaderIndex = j;
-          break;
-        }
-      }
-      var dEnd = (nextHeaderIndex !== -1) ? (nextHeaderIndex) : sheet.getLastRow();
-      
-      if (dEnd >= dStart) {
-        for (var r = dStart; r <= dEnd; r++) {
-          try {
-            var dateVal = sheet.getRange(r, 1).getValue();
-            if (!dateVal) continue;
-            
-            if (needsHeaderRebuild) {
-              var rowVals = sheet.getRange(r, 4, 1, sheet.getLastColumn() - 3).getValues()[0];
-              if ((rowVals[0] === '' || rowVals[0] === null) && rowVals[1] !== '' && rowVals[1] !== null) {
-                rowVals.shift();
-                rowVals.push('');
-                sheet.getRange(r, 4, 1, rowVals.length).setValues([rowVals]);
-              }
-            }
-            
-            var costVal = sheet.getRange(r, 2).getValue() || 0;
-            var discVal = sheet.getRange(r, discCol).getValue();
-            var recVal = sheet.getRange(r, recCol).getValue();
-            
-            // ถ้าช่องส่วนลดถูกใส่เป็นค่ายอดรวม (เช่น 1698.00) ให้แก้กลับเป็น 0
-            if (discVal === costVal || typeof discVal === 'string') {
-              sheet.getRange(r, discCol).setValue(0);
-            }
-            
-            // ใส่สูตรราคาสุทธิ =B[r]-EM[r]
-            sheet.getRange(r, netCol).setFormula("=B" + r + "-" + discL + r);
-            
-            // ถ้ารับเงินแล้วเป็น TRUE ให้ปรับเป็นค่ายอดเงินสุทธิ
-            if (recVal === true || recVal === false || typeof recVal === 'boolean') {
-              sheet.getRange(r, recCol).setValue((costVal || 0) - (sheet.getRange(r, discCol).getValue() || 0));
-            }
-            
-            // ใส่สูตรตรวจสอบ =EO[r]=EN[r]
-            sheet.getRange(r, chkCol).setFormula("=" + recL + r + "=" + netL + r);
-            
-            // ถ้าช่องจำนวนชิ้นมีข้อความ (เช่น 'ผัก') ให้ล้างออก
-            var pcsVal = sheet.getRange(r, pcsCol).getValue();
-            if (typeof pcsVal === 'string' && pcsVal !== '') {
-              sheet.getRange(r, pcsCol).setValue('');
-            }
-          } catch(e) {}
-        }
-      }
-      
-      if (needsHeaderRebuild) {
-        try {
-          sheet.getRange(sRow, 1, 3, sheet.getLastColumn()).breakApart();
-        } catch (e) {}
-        createMonthlyHeaderBlock(sheet, sRow, monthStr);
-      }
-    }
-  }
-}`}
+  sheet.appendRow(row1);
+  sheet.appendRow(row2);
+  sheet.appendRow(row3);
+
+  var lastCol = row3.length;
+  sheet.getRange(1, 1, 1, lastCol).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
+  sheet.getRange(2, 1, 1, lastCol).setFontWeight("bold").setBackground("#3b82f6").setFontColor("#ffffff");
+  sheet.getRange(3, 1, 1, lastCol).setFontWeight("bold").setBackground("#f3f4f6").setFontColor("#1f2937");
+}
+`}
                 onClick={(e) => {
                   e.target.select();
                   navigator.clipboard.writeText(e.target.value);
