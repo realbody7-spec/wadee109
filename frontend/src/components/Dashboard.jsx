@@ -52,6 +52,28 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
     "others": { label: 'อื่นๆ', color: '#9ca3af' }
   };
 
+  const normalizeCatKey = (rawCat) => {
+    if (!rawCat) return 'others';
+    const c = rawCat.toString().trim();
+    if (c.includes('เครืองครัว') || c.includes('เครื่องครัว')) return 'เครื่องครัว/ของแห้ง';
+    if (c.includes('เนื้อหมู') || c.includes('หมู')) return 'เนื้อหมู / ไก่';
+    if (c.includes('เนื้อวัว') || c.includes('วัว')) return 'เนื้อวัว';
+    if (c.includes('ทะเล')) return 'ทะเล';
+    if (c.includes('ผัก')) return 'ผัก';
+    if (c.includes('ทอด')) return 'ของทอด';
+    if (c.includes('จิ้ม') || c.includes('จิ่ม')) return 'น้ำจิ้ม';
+    if (c.includes('ดื่ม')) return 'เครื่องดื่ม';
+    if (c.includes('เงินเดือน') || c.includes('ค่าเช่า')) return 'เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน';
+    if (c.includes('ส่ง')) return 'ค่าส่งของ';
+    if (c.includes('แข็ง')) return 'น้ำแข็ง';
+    if (c.includes('แก๊ส')) return 'แก๊ส';
+    if (c.includes('ถ่าน')) return 'ถ่าน';
+    if (c.includes('น้ำ') || c.includes('ไฟ') || c.includes('เน็ต')) return 'ค่าน้ำ + ค่าไฟ + เน็ต';
+    if (c.includes('การตลาด') || c.includes('ปรับปรุง')) return 'การตลาด/ปรับปรุงร้าน';
+    if (c.includes('Asset') || c.includes('asset')) return 'Asset';
+    return categoriesConfig[c] ? c : 'others';
+  };
+
   // Format dates
   const formatDate = (isoString) => {
     if (!isoString) return 'ยังไม่เคยทำงาน';
@@ -94,10 +116,28 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
     const rawCatLower = rawCat.toLowerCase();
     const itemName = (item.name || '').toString().trim().toLowerCase();
 
-    // 1. Exact match with configured Thai categories
+    // 1. Typos and spelling variations from Google Sheet headers
+    if (rawCat.includes('เครืองครัว') || rawCat.includes('เครื่องครัว')) return 'เครื่องครัว/ของแห้ง';
+    if (rawCat.includes('เนื้อหมู') || rawCat.includes('หมูู')) return 'เนื้อหมู / ไก่';
+    if (rawCat.includes('เนื้อวัว') || rawCat.includes('วัว')) return 'เนื้อวัว';
+    if (rawCat.includes('ทะเล')) return 'ทะเล';
+    if (rawCat.includes('ผัก')) return 'ผัก';
+    if (rawCat.includes('ทอด')) return 'ของทอด';
+    if (rawCat.includes('น้ำจิ่ม') || rawCat.includes('น้ำจิ้ม') || rawCat.includes('จิ้ม')) return 'น้ำจิ้ม';
+    if (rawCat.includes('เครืองดื่ม') || rawCat.includes('เครื่องดื่ม')) return 'เครื่องดื่ม';
+    if (rawCat.includes('เงินเดือน') || rawCat.includes('ค่าเช่า') || rawCat.includes('กับข้าวพนักงาน')) return 'เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน';
+    if (rawCat.includes('ส่งของ') || rawCat.includes('ค่าส่ง')) return 'ค่าส่งของ';
+    if (rawCat.includes('น้ำเเข็ง') || rawCat.includes('น้ำแข็ง')) return 'น้ำแข็ง';
+    if (rawCat.includes('แก๊ส')) return 'แก๊ส';
+    if (rawCat.includes('ถ่าน')) return 'ถ่าน';
+    if (rawCat.includes('ค่าน้ำ') || rawCat.includes('ต่าไฟ') || rawCat.includes('ค่าไฟ') || rawCat.includes('เน็ต')) return 'ค่าน้ำ + ค่าไฟ + เน็ต';
+    if (rawCat.includes('การตลาด') || rawCat.includes('ปรับปรุง')) return 'การตลาด/ปรับปรุงร้าน';
+    if (rawCat.includes('Asset') || rawCat.includes('asset')) return 'Asset';
+
+    // 2. Exact match with configured Thai categories
     if (categoriesConfig[rawCat]) return rawCat;
 
-    // 2. English / Alias mappings
+    // 3. English / Alias mappings
     if (rawCatLower === 'meat') return 'เนื้อหมู / ไก่';
     if (rawCatLower === 'seafood') return 'ทะเล';
     if (rawCatLower === 'vegetables' || rawCatLower === 'vegetable' || rawCatLower === 'veg') return 'ผัก';
@@ -110,7 +150,7 @@ export default function Dashboard({ sops, schedules, logs, settings, onTriggerSc
     if (rawCatLower === 'salary' || rawCatLower === 'rent') return 'เงินเดือนพนักงาน + ค่าเช่าร้าน + กับข้าวพนักงาน';
     if (rawCatLower === 'utility' || rawCatLower === 'utilities') return 'ค่าน้ำ + ค่าไฟ + เน็ต';
 
-    // 3. Keyword matching from Item Name
+    // 4. Keyword matching from Item Name
     if (itemName.includes('หมู') || itemName.includes('ไก่') || itemName.includes('ตับ') || itemName.includes('เบคอน') || itemName.includes('สันคอ') || itemName.includes('สามชั้น') || itemName.includes('ปีก')) {
       return 'เนื้อหมู / ไก่';
     }
