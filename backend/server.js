@@ -548,7 +548,7 @@ app.post('/api/inventory', async (req, res) => {
   await addInventoryItem(newItem);
 
   // Sync to Google Sheets if webhook URL is configured
-  const settings = readData(SETTINGS_FILE, {});
+  const settings = getCombinedSettings();
   if (settings.googleSheetWebhookUrl) {
     let base64Image = null;
     if (imagePath && imagePath.startsWith('/uploads/')) {
@@ -1131,8 +1131,8 @@ app.listen(PORT, async () => {
   console.log(`[Server] Backend running on http://localhost:${PORT}`);
   
   // Initialize Database (Supabase PostgreSQL / Local JSON)
-  const settings = readData(SETTINGS_FILE, {});
-  await initDatabase(settings.supabaseDbUrl || process.env.DATABASE_URL || process.env.SUPABASE_DB_URL);
+  const settings = getCombinedSettings();
+  await initDatabase(settings.supabaseDbUrl, settings.supabaseApiKey);
   
   // Run user roles migration / initialization
   try {
