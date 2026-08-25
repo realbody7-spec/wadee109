@@ -1543,5 +1543,20 @@
     "portionSize": 1,
     "portionUnit": "ชุด",
     "associatedPosItem": ""
+  },
+  {
+    "id": "user-pasted-20260824-0",
+    "date": "2026-08-24T08:00:00.000Z",
+    "name": "ยอดซื้อวัตถุดิบ (24/08/2026)",
+    "category": "meat",
+    "quantity": 1,
+    "pieces": 1,
+    "unit": "ชุด",
+    "cost": 9640,
+    "billNumber": "GS-PASTED-1",
+    "image": null,
+    "portionSize": 1,
+    "portionUnit": "ชุด",
+    "associatedPosItem": ""
   }
 ]
