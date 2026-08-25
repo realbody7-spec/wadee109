@@ -88,9 +88,24 @@ async function runImport() {
     associatedPosItem: ''
   }));
 
+  // Merge items with existing local inventory.json
   const inventoryJsonPath = path.join(__dirname, '..', 'backend', 'data', 'inventory.json');
-  fs.writeFileSync(inventoryJsonPath, JSON.stringify(localItems, null, 2), 'utf8');
-  console.log(`✅ Saved ${localItems.length} historical items to backend/data/inventory.json`);
+  let existingItems = [];
+  try {
+    if (fs.existsSync(inventoryJsonPath)) {
+      existingItems = JSON.parse(fs.readFileSync(inventoryJsonPath, 'utf8'));
+    }
+  } catch (e) {}
+
+  const mergedMap = new Map();
+  // Keep all existing items first
+  existingItems.forEach(it => { if (it && it.id) mergedMap.set(it.id, it); });
+  // Add imported items
+  localItems.forEach(it => { if (it && it.id && !mergedMap.has(it.id)) mergedMap.set(it.id, it); });
+
+  const finalMerged = Array.from(mergedMap.values());
+  fs.writeFileSync(inventoryJsonPath, JSON.stringify(finalMerged, null, 2), 'utf8');
+  console.log(`✅ Safely merged and saved ${finalMerged.length} total items to backend/data/inventory.json`);
 
   console.log('Upserting all historical items to Supabase Cloud Database...');
   const { data, error } = await supabase.from('inventory').upsert(items, { onConflict: 'id' });

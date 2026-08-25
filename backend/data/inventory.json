@@ -1,20 +1,5 @@
 [
   {
-    "id": "inv-1787663509693",
-    "date": "2026-08-25T13:11:49.693Z",
-    "name": "เนื้อหมูสันนอกสด",
-    "category": "meat",
-    "quantity": 10,
-    "pieces": 0,
-    "unit": "kg",
-    "cost": 1450,
-    "billNumber": "INV-TEST-999",
-    "image": null,
-    "portionSize": 0.2,
-    "portionUnit": "kg",
-    "associatedPosItem": ""
-  },
-  {
     "id": "gs-historical-1-20260625",
     "date": "2026-06-25T08:00:00.000Z",
     "name": "ยอดซื้อวัตถุดิบ (25/6/2026)",
@@ -1539,6 +1524,21 @@
     "unit": "ชุด",
     "cost": 1975,
     "billNumber": "GS-105",
+    "image": null,
+    "portionSize": 1,
+    "portionUnit": "ชุด",
+    "associatedPosItem": ""
+  },
+  {
+    "id": "gs-historical-106-20260825",
+    "date": "2026-08-25T08:00:00.000Z",
+    "name": "ยอดซื้อวัตถุดิบ (25/8/2026)",
+    "category": "meat",
+    "quantity": 1,
+    "pieces": 1,
+    "unit": "ชุด",
+    "cost": 1450,
+    "billNumber": "GS-106",
     "image": null,
     "portionSize": 1,
     "portionUnit": "ชุด",
