@@ -295,18 +295,54 @@ export async function getInventoryItems() {
 
         const localItems = getLocalData('inventory.json', []);
         const mergedMap = new Map();
-        [...cloudItems, ...localItems].forEach(it => {
+        [...localItems, ...cloudItems].forEach(it => {
           if (it && it.id && !mergedMap.has(it.id)) {
             mergedMap.set(it.id, it);
           }
         });
-        return Array.from(mergedMap.values());
+        const allItems = Array.from(mergedMap.values());
+        
+        // Filter out lumped summary rows when itemized rows exist for that date
+        const datesWithItemized = new Set();
+        allItems.forEach(it => {
+          if (it && it.id && it.id.startsWith('gs-col-')) {
+            const dKey = it.date ? it.date.substring(0, 10) : '';
+            if (dKey) datesWithItemized.add(dKey);
+          }
+        });
+
+        const cleanItems = allItems.filter(it => {
+          if (!it || !it.id) return false;
+          const dKey = it.date ? it.date.substring(0, 10) : '';
+          if (datesWithItemized.has(dKey) && (it.id.startsWith('gs-new-sheet-') || it.id.startsWith('gs-historical-') || it.id.startsWith('gs-rowtotal-') || it.id.startsWith('user-pasted-'))) {
+            return false;
+          }
+          return true;
+        });
+
+        return cleanItems;
       } catch (e) {
         console.error('Supabase JS query error (getInventoryItems):', e);
       }
     }
   }
-  return getLocalData('inventory.json', []);
+
+  const localOnly = getLocalData('inventory.json', []);
+  const datesWithItemizedLocal = new Set();
+  localOnly.forEach(it => {
+    if (it && it.id && it.id.startsWith('gs-col-')) {
+      const dKey = it.date ? it.date.substring(0, 10) : '';
+      if (dKey) datesWithItemizedLocal.add(dKey);
+    }
+  });
+  return localOnly.filter(it => {
+    if (!it || !it.id) return false;
+    const dKey = it.date ? it.date.substring(0, 10) : '';
+    if (datesWithItemizedLocal.has(dKey) && (it.id.startsWith('gs-new-sheet-') || it.id.startsWith('gs-historical-') || it.id.startsWith('gs-rowtotal-') || it.id.startsWith('user-pasted-'))) {
+      return false;
+    }
+    return true;
+  });
 }
 
 export async function addInventoryItem(item) {
